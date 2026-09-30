@@ -90,3 +90,13 @@ LOG_INTERVAL = 1.0  # s, 주기 로그 간격
 TUNER_V = 0.10  # m/s, 키보드 전진 속도
 TUNER_W = 1.0  # rad/s, 키보드 회전 속도
 TUNER_FRAME_DIR = "frames"  # 컨트롤러 폴더 기준
+TUNER_LOG_FILE = "output/measurements.csv"  # 컨트롤러 폴더 기준, m 키 측정 기록
+TUNER_SCAN_W = 0.4  # rad/s, 자동 주행 제자리 회전 속도
+TUNER_SCAN_TURNS = 1.0  # 회전, 자동 접근에서 대상을 찾지 못하면 멈추는 누적 회전량
+TUNER_SURVEY_STEP = 0.5236  # rad (30°), 회전 측정 간격
+TUNER_ALIGN_TOL = 0.05  # rad, 정렬 완료 방위각 오차
+TUNER_ALIGN_GAIN = 1.5  # 1/s, 정렬 각속도 = 이득 × 방위각
+TUNER_APPROACH_V = 0.08  # m/s, 자동 접근 전진 속도
+TUNER_MEASURE_DISTS = (3.0, 2.0, 1.0)  # m, 자동 접근 측정 지점
+TUNER_STOP_DIST = 0.5  # m, 자동 접근 정지 거리
+TUNER_LOST_TIMEOUT = 2.0  # s, 대상 미검출이 이 시간 이상이면 다시 탐색
