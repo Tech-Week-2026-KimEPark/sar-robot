@@ -1186,7 +1186,7 @@ OfficeChair {
 TurtleBot3Burger {
   translation -1.2652295534438875 1.8113497874281164 -0.0002478205860312402
   rotation -0.0023441704489854196 -0.010770757893299615 -0.9999392459741292 0.42440198801063334
-  controller "sar_mission"
+  controller "sar_main"
   extensionSlot [
     Camera {
       translation 0.05 0 -0.08

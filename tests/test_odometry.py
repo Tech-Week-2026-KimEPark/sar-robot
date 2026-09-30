@@ -2,34 +2,68 @@ import math
 
 import pytest
 
-from sar.geometry import Pose
-from sar.localization.odometry import WheelOdometry, integrate
+from sar import config
+from sar.odometry import Odometry
 
-L = 0.16
+R, L = config.WHEEL_RADIUS, config.WHEEL_SEPARATION
+
+
+def drive(odom: Odometry, d_left: float, d_right: float) -> tuple[float, float, float]:
+    """좌우 바퀴 이동 거리 [m]만큼 엔코더 값을 주고 pose를 반환."""
+    odom.update(0.0, 0.0)
+    odom.update(d_left / R, d_right / R)
+    return odom.pose()
 
 
 def test_straight():
-    pose = integrate(Pose(), 0.5, 0.5, L)
-    assert (pose.x, pose.y, pose.theta) == pytest.approx((0.5, 0.0, 0.0))
+    assert drive(Odometry(0.0, 0.0, 0.0), 0.5, 0.5) == pytest.approx((0.5, 0.0, 0.0))
 
 
 def test_rotate_in_place():
     d = math.pi / 2 * L / 2  # 90° 제자리 회전 시 바퀴 이동 거리
-    pose = integrate(Pose(), -d, d, L)
-    assert (pose.x, pose.y, pose.theta) == pytest.approx((0.0, 0.0, math.pi / 2))
+    assert drive(Odometry(0.0, 0.0, 0.0), -d, d) == pytest.approx((0.0, 0.0, math.pi / 2))
 
 
 def test_quarter_arc_left():
     # 반지름 1 m 원호로 90° 좌회전하면 (1, 1)에 도착
     r = 1.0
-    d_left = (r - L / 2) * math.pi / 2
-    d_right = (r + L / 2) * math.pi / 2
-    pose = integrate(Pose(), d_left, d_right, L)
-    assert (pose.x, pose.y, pose.theta) == pytest.approx((1.0, 1.0, math.pi / 2))
+    pose = drive(Odometry(0.0, 0.0, 0.0), (r - L / 2) * math.pi / 2, (r + L / 2) * math.pi / 2)
+    assert pose == pytest.approx((1.0, 1.0, math.pi / 2))
 
 
-def test_wheel_odometry_uses_angle_difference():
-    odom = WheelOdometry(wheel_radius=0.033, wheel_separation=L)
-    odom.update(10.0, 10.0)  # 첫 값은 기준값
-    pose = odom.update(20.0, 20.0)
-    assert pose.x == pytest.approx(10.0 * 0.033)
+def test_start_pose_heading_west():
+    # 시작 방향 π(서쪽)에서 직진하면 x가 감소
+    x, y, _ = drive(Odometry(-0.3, -7.5, math.pi), 1.0, 1.0)
+    assert (x, y) == pytest.approx((-1.3, -7.5))
+
+
+def test_first_update_is_baseline():
+    odom = Odometry(0.0, 0.0, 0.0)
+    odom.update(10.0, 10.0)
+    assert odom.pose() == (0.0, 0.0, 0.0)
+
+
+def test_compass_update_moves_heading_and_reduces_variance():
+    with_compass, without = Odometry(0.0, 0.0, 0.0), Odometry(0.0, 0.0, 0.0)
+    for odom in (with_compass, without):
+        odom.update(0.0, 0.0)
+        odom.update(1.0, 1.0)
+    with_compass.update(1.0, 1.0, compass=0.1)
+    without.update(1.0, 1.0)
+    assert 0.0 < with_compass.pose()[2] < 0.1
+    assert with_compass.heading_var() < without.heading_var()
+
+
+def test_compass_wraps_across_pi():
+    # 방향 π 근처에서 나침반 -π+0.1은 +0.1 rad 차이로 처리
+    odom = Odometry(0.0, 0.0, math.pi)
+    odom.update(0.0, 0.0)
+    odom.update(1.0, 1.0)
+    odom.update(1.0, 1.0, compass=-math.pi + 0.1)
+    assert abs(odom.pose()[2]) > 3.0
+
+
+def test_correct():
+    odom = Odometry(1.0, 2.0, 0.0)
+    odom.correct(0.1, -0.2, 0.05)
+    assert odom.pose() == pytest.approx((1.1, 1.8, 0.05))

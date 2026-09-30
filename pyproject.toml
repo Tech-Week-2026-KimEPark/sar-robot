@@ -1,22 +1,18 @@
-[build-system]
-requires = ["setuptools>=64"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "sar-robot"
 version = "0.1.0"
 requires-python = ">=3.10,<3.11"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
 [tool.pytest.ini_options]
-pythonpath = ["src", "scripts"]
+# 팀 코드는 컨트롤러 폴더 안의 sar 패키지. Webots와 같은 import 경로로 테스트
+pythonpath = ["controllers/sar_main", "scripts"]
 testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+# import 정렬에서 sar를 팀 패키지(first-party)로 인식
+src = ["controllers/sar_main", "scripts"]
 # Intro 원본 실습 컨트롤러는 수정하지 않음
 extend-exclude = ["controllers/tb3_*"]
 

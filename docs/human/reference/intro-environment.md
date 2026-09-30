@@ -64,9 +64,9 @@ model.to("cpu")  # CPU
 
 | 이름 | 값 | sar-robot 위치 |
 |---|---|---|
-| `WHEEL_RADIUS` | 0.033 m | `src/sar/config.py` |
-| `WHEEL_SEPARATION` | 0.160 m | `src/sar/config.py` |
-| `ROBOT_RADIUS` | 0.105 m | `src/sar/config.py` |
+| `WHEEL_RADIUS` | 0.033 m | `controllers/sar_main/sar/config.py` |
+| `WHEEL_SEPARATION` | 0.160 m | `controllers/sar_main/sar/config.py` |
+| `ROBOT_RADIUS` | 0.105 m | `controllers/sar_main/sar/config.py` |
 
 `WHEEL_RADIUS`와 `WHEEL_SEPARATION`은 Webots R2025a `TurtleBot3Burger.proto`의 바퀴 반지름과 바퀴 anchor 값과 일치합니다.
 
@@ -87,7 +87,7 @@ Intro의 실습 파일을 sar-robot에 복사했습니다. 복사한 컨트롤�
 | 월드 | `apartment.wbt`, `breakroom_*.wbt` 5개, `empty.wbt` | 실습 월드. 숨김 파일 `.*.wbproj`는 Webots 화면 상태 |
 | PROTO | `RedApple`, `GreenApple`, `OrangeApple`, `PurpleApple` | 목표 물체 |
 
-`sar_mission` 컨트롤러와 `worlds/sar_dev.wbt`는 sar-robot에서 추가한 파일입니다.
+`sar_main` 컨트롤러와 `worlds/sar_dev.wbt`는 sar-robot에서 추가한 파일입니다.
 
 `tests/test_intro_sync.py`는 Intro와 sar-robot의 Git 인덱스 blob 해시를 비교합니다. Intro 저장소가 형제 폴더 `../PNU-TECHWEEK-260930`에 있으면 `pytest`에서 누락·변경 파일을 검출합니다. 2026-09-30 기준 Intro 추적 파일 27개가 모두 동일합니다.
 
@@ -106,7 +106,7 @@ diff -r -x .DS_Store ../PNU-TECHWEEK-260930/worlds worlds
 |---|---|---|---|
 | 패키지 설치 위치 | 시스템 Python에 `pip install` | 저장소 `.venv` | 팀원 PC마다 같은 버전 유지 |
 | Webots Python | 시스템 `python3` | Preferences의 Python command를 `.venv/bin/python`으로 설정 | macOS 기본 `python3`는 3.9이며 패키지 없음 |
-| 팀 코드 import | 없음 | `pip install -e .`로 `sar` 패키지 설치 | 컨트롤러에서 `src/sar` import |
+| 팀 코드 import | 없음 | 컨트롤러 폴더 안 `sar/` 패키지. 설치 없음 | 컨트롤러 폴더 1개로 제출·실행 (`CONTEXT.md` 구조) |
 | Webots 원격 PROTO·에셋 | 자동 다운로드 | `scripts/prefetch_webots_assets.py`로 사전 캐시 | macOS Webots R2025a의 다운로드 오류(`error code: 399`, `error code: 2`) |
 
 설치 절차는 [개발 환경 설정](../how-to/dev-setup.md)에 있습니다.
