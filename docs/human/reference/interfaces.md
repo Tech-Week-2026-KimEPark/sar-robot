@@ -51,7 +51,9 @@ sar-robot 모듈의 구현 상태와 코드 위치를 정리한 문서입니다.
 | `sar/planner.py` | `DistanceField.path(xy)` (추가) | 월드 좌표 | xy에서 기준점까지 경로. 도달 불가이거나 지도가 바뀌었으면 `None` |
 | `sar/planner.py` | `DistanceField.is_current()` (추가) | 없음 | 생성 이후 계획용 지도 상태가 그대로인지 여부 |
 | `sar/local_control.py` | `pure_pursuit(pose, path, lookahead=config.LOOKAHEAD)` | pose `(x, y, theta)`, 경로 `[(x, y), ...]` | `(v, w, reached)`. 목표 각도 차이 55° 이상이면 제자리 회전 |
-| `sar/local_control.py` | `safety_filter(v, w, ranges)` | 속도 명령, 라이다 360개 | `(v, w, blocked)`. 정면 ±25° 콘 안 `config.STOP_DIST` 이내면 정지 |
+| `sar/local_control.py` | `safety_filter(v, w, ranges)` | 속도 명령, 라이다 360개 | `(v, w, blocked)`. 진행 방향 콘(반각은 로봇 반지름+`SAFETY_MARGIN`이 `STOP_DIST`에서 덮이도록 계산) 안 `config.STOP_DIST` 이내면 정지, `STOP_DIST`~`STOP_DIST`+0.3m는 감속·양보 |
+| `sar/local_control.py` | `predict_conflict(pose, robot_v, person, horizon)` (추가) | pose, 로봇 선속도, 사람 추적 항목(`{"x","y","vx","vy"}`), 예측 시간 [s] | `(t_star, d_min)`. 등속 가정 최근접 시각·거리. 사람-회피-설계.md 3.3절 |
+| `sar/local_control.py` | `yield_command(pose, ranges, person)` (추가) | pose, 라이다 360개, 사람 추적 항목 | `(v, w, done)`. 여유 있는 쪽으로 비켜서거나 복도면 후진. `done`이면 YIELD 종료 가능. 사람-회피-설계.md 3.4절 |
 | `sar/mission.py` | `Mission(io, odom, grid, detector, log=None)` | `RobotIO`, `Odometry`, `GridMap`, `TargetDetector`, 로그 함수 | 미션 객체. 시작점은 생성 시 `odom.pose()` |
 | `sar/mission.py` | `Mission.tick()` | 없음 | 없음. 매 step 1회 호출 |
 | `sar/mission.py` | `fit_compass(samples)` (추가) | 시작 회전 `[(오도메트리 방향, 나침반 원시각), ...]` | `(sign, offset, scale)`. 회전량 부족·비율 불일치면 `None` |
