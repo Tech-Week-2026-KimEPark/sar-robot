@@ -5,19 +5,21 @@
 ## 빠른 시작
 
 ```bash
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -r requirements-dev.txt
+python3.10 -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt -r requirements-yolo.txt
+.venv/bin/python -m pip install -e .
 .venv/bin/python -m pytest -q
 .venv/bin/python scripts/prefetch_webots_assets.py
 ```
 
-Webots에서 `worlds/sar_dev.wbt`를 열어 실행하십시오. 마지막 명령은 Webots 텍스처 다운로드 오류를 방지하기 위한 에셋 사전 캐시입니다. 전체 절차는 [개발 환경 설정](docs/human/how-to/dev-setup.md)에 있습니다.
+Webots Preferences의 Python command를 `.venv/bin/python` 절대 경로로 설정한 뒤 `worlds/sar_dev.wbt`를 열어 실행하십시오. 마지막 명령은 Webots 텍스처 다운로드 오류를 방지하기 위한 에셋 사전 캐시입니다. 패키지 버전은 Intro 과정 기준입니다. 전체 절차는 [개발 환경 설정](docs/human/how-to/dev-setup.md)에 있습니다.
 
 ## 문서
 
 | 문서 | 내용 |
 |---|---|
 | [개발 환경 설정](docs/human/how-to/dev-setup.md) | 가상환경, Webots 설치·연결, 테스트 |
+| [Intro 과정 환경 기준](docs/human/reference/intro-environment.md) | Python·패키지 버전, 로봇 상수, 실습 파일 |
 | [코드 구조](docs/human/explanation/architecture.md) | 폴더 구성, 데이터 흐름 |
 | [코드 작성 규칙](docs/human/reference/code-conventions.md) | Python 스타일, 이름·상수·테스트 규칙 |
 | [모듈 인터페이스](docs/human/reference/interfaces.md) | 좌표·단위 규칙, 모듈 함수 형식 |

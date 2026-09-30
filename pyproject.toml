@@ -1,7 +1,14 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "sar-robot"
 version = "0.1.0"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.10,<3.11"
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "scripts"]
@@ -9,7 +16,9 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py310"
+# Intro 원본 실습 컨트롤러는 수정하지 않음
+extend-exclude = ["controllers/tb3_*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
