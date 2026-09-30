@@ -1,30 +1,26 @@
-"""Webots 컨트롤러 진입점. RobotIO를 생성하고 미션 루프를 실행한다.
+"""Webots 컨트롤러 진입점. 모듈을 생성하고 미션 루프를 실행한다.
 
 팀 모듈은 같은 폴더의 sar/ 패키지에 있다. Webots는 컨트롤러 폴더를 import 경로에 포함하므로
-별도 설치 없이 import된다. Mission 구현 전까지는 정지 상태에서 위치와 라이다 값만 출력한다.
+별도 설치 없이 import된다. 상태 머신은 sar/mission.py에 있다.
 """
 
 from sar import config
+from sar.grid_map import GridMap
+from sar.mission import Mission
 from sar.odometry import Odometry
+from sar.perception import TargetDetector
 from sar.robot_io import RobotIO
 
 
 def main() -> None:
     io = RobotIO()
     odom = Odometry(config.START_X, config.START_Y, config.START_THETA)
-    last_log = -config.LOG_INTERVAL
+    detector = TargetDetector(config.TARGET_COLOR, config.YOLO_MODEL)
+    if detector.load_error:
+        print(f"YOLO 로드 실패, 색 분할만 사용: {detector.load_error}")
+    mission = Mission(io, odom, GridMap(), detector, log=print)
     while io.step():
-        odom.update(*io.encoders())
-        io.drive(0.0, 0.0)  # Mission 구현 전 정지 상태 유지
-        if io.time() - last_log >= config.LOG_INTERVAL:
-            x, y, theta = odom.pose()
-            ranges = io.lidar()
-            front = ranges[len(ranges) // 2] if ranges else float("nan")
-            print(
-                f"[t={io.time():.1f}s] pose=({x:.2f}, {y:.2f}, {theta:.2f}) "
-                f"lidar_points={len(ranges) if ranges else 0} front={front:.2f}m"
-            )
-            last_log = io.time()
+        mission.tick()
 
 
 if __name__ == "__main__":
