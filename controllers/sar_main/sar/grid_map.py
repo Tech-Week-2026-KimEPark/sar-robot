@@ -5,6 +5,8 @@
   [L_MIN, L_MAX]로 제한 (과제와 구현 기준 6장)
 - 공개값은 -1 모름, 0 빈칸, 1 장애물
 - 광선 추적은 numpy로 모든 빔을 한 번에 표본화. 스캔 1회에 같은 칸은 한 번만 갱신
+- plan_version은 계획에 쓰는 분류(장애물 여부, 확인 여부)가 바뀔 때만 증가. log-odds 값만
+  바뀐 갱신은 팽창·프론티어 캐시를 유지
 """
 
 import math
@@ -36,7 +38,9 @@ class GridMap:
         self.y0 = center_y - self.n * res / 2
         self.logodds = np.zeros((self.n, self.n), np.float32)
         self.seen = np.zeros((self.n, self.n), bool)
-        self._cache: dict[str, np.ndarray] = {}
+        self.version = 0  # update()로 값이 바뀔 때마다 증가
+        self.plan_version = 0  # 장애물·확인 분류가 바뀔 때만 증가. 계획 결과의 유효 상태 식별
+        self._cache: dict = {}
 
     # 좌표 변환
 
@@ -56,9 +60,11 @@ class GridMap:
 
     def update(self, pose: Sequence[float] | None, ranges: Sequence[float] | None) -> None:
         """로봇 pose (x, y, theta)와 라이다 거리 목록으로 log-odds 갱신. None이면 무시."""
-        if pose is None or not ranges:
+        if pose is None or ranges is None or len(ranges) == 0:
             return
         x, y, theta = pose
+        if not (math.isfinite(x) and math.isfinite(y) and math.isfinite(theta)):
+            return
         r = np.asarray(ranges, np.float64)
         count = len(r)
         # 인덱스 i의 로봇 좌표계 각도 = pi - i * 2pi / N (180 정면, 90 왼쪽)
@@ -84,12 +90,23 @@ class GridMap:
         free_idx = np.setdiff1d(np.unique(free_idx), hit_idx, assume_unique=True)
 
         flat = self.logodds.reshape(-1)
-        flat[free_idx] += config.L_FREE
-        flat[hit_idx] += config.L_OCC
-        np.clip(self.logodds, config.L_MIN, config.L_MAX, out=self.logodds)
         seen = self.seen.reshape(-1)
-        seen[free_idx] = True
-        seen[hit_idx] = True
+        touched = np.concatenate([free_idx, hit_idx])
+        occ_before = flat[touched] > config.OCC_THRESHOLD
+        new_cells = not seen[touched].all()
+        flat[free_idx] = np.maximum(flat[free_idx] + config.L_FREE, config.L_MIN)
+        flat[hit_idx] = np.minimum(flat[hit_idx] + config.L_OCC, config.L_MAX)
+        seen[touched] = True
+        self.version += 1
+        # 분류가 그대로이면 팽창·프론티어·계획 영역 캐시를 유지
+        if new_cells or not np.array_equal(occ_before, flat[touched] > config.OCC_THRESHOLD):
+            self.plan_version += 1
+            self._cache.clear()
+
+    def invalidate(self) -> None:
+        """logodds·seen 배열을 직접 수정한 뒤 호출. 캐시를 지우고 버전을 증가."""
+        self.version += 1
+        self.plan_version += 1
         self._cache.clear()
 
     def _flat_cells(self, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
@@ -122,7 +139,9 @@ class GridMap:
             if not occ.any():
                 self._cache["clear"] = np.full(occ.shape, np.inf, np.float32)
             else:
-                dist = cv2.distanceTransform((~occ).astype(np.uint8), cv2.DIST_L2, 5)
+                free = (~occ).astype(np.uint8)
+                # 정확한 유클리드 거리 (근사 마스크는 최대 2% 과대평가해 팽창이 부족해짐)
+                dist = cv2.distanceTransform(free, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
                 self._cache["clear"] = dist * self.res
         return self._cache["clear"]
 
@@ -132,10 +151,12 @@ class GridMap:
         blocked: 장애물에서 INFLATE 이내 (로봇 중심 진입 불가)
         soft: blocked 바깥 WALL_BAND 폭 (벽 근처 추가 비용)
         """
-        clear = self.clearance()
-        blocked = clear < config.INFLATE
-        soft = ~blocked & (clear < config.INFLATE + config.WALL_BAND)
-        return self.occupied(), blocked, soft, ~self.seen
+        if "layers" not in self._cache:
+            clear = self.clearance()
+            blocked = clear < config.INFLATE
+            soft = ~blocked & (clear < config.INFLATE + config.WALL_BAND)
+            self._cache["layers"] = (self.occupied(), blocked, soft, ~self.seen)
+        return self._cache["layers"]
 
     def public(self) -> np.ndarray:
         """공개값 격자 int8 배열 (-1 모름, 0 빈칸, 1 장애물). viz.render_map 입력."""
@@ -149,12 +170,18 @@ class GridMap:
         프론티어 칸은 모르는 칸과 4방향으로 맞닿은 아는 빈칸. 8방향 연결로 묶고
         MIN_FRONTIER_CELLS 미만 묶음은 센서 잡음으로 제외.
         """
+        if "frontiers" in self._cache:
+            return list(self._cache["frontiers"])
         free = self.seen & ~self.occupied()
         unknown = (~self.seen).astype(np.uint8)
         near_unknown = cv2.dilate(unknown, _CROSS).astype(bool)
         mask = (free & near_unknown).astype(np.uint8)
         count, labels = cv2.connectedComponents(mask, connectivity=8)
+        sizes = np.bincount(labels.ravel())[labels].astype(np.int32)
+        sizes[(labels == 0) | (sizes < config.MIN_FRONTIER_CELLS)] = 0
+        self._cache["frontier_sizes"] = sizes
         if count <= 1:
+            self._cache["frontiers"] = []
             return []
         rows, cols = np.nonzero(labels)
         ids = labels[rows, cols]
@@ -166,29 +193,38 @@ class GridMap:
             if len(rs) >= config.MIN_FRONTIER_CELLS:
                 result.append((len(rs), list(zip(rs.tolist(), cs.tolist(), strict=True))))
         result.sort(key=lambda item: -item[0])
-        return result
+        self._cache["frontiers"] = result
+        return list(result)
+
+    def frontier_sizes(self) -> np.ndarray:
+        """칸마다 그 칸이 속한 프론티어 묶음의 칸 수 (int32). 프론티어가 아니면 0."""
+        if "frontier_sizes" not in self._cache:
+            self.frontiers()
+        return self._cache["frontier_sizes"]
 
 
 def simulate_scan(
     walls: np.ndarray, to_cell, pose: Sequence[float], count: int = 360
 ) -> list[float]:
-    """벽 bool 격자에서 라이다 거리 목록 생성 (단독 테스트·pytest용). 반사 없으면 inf."""
+    """벽 bool 격자에서 라이다 거리 목록 생성 (단독 테스트·pytest용). 반사 없으면 inf.
+
+    to_cell은 GridMap.to_cell. 모든 빔을 RAY_STEP / 2 간격으로 표본화해 첫 벽 칸 거리를 반환.
+    """
     x, y, theta = pose
+    gm = to_cell.__self__
     step = config.RAY_STEP / 2
-    ranges = []
-    for i in range(count):
-        a = theta + math.pi - i * 2 * math.pi / count
-        dist = math.inf
-        for k in range(1, int(config.LIDAR_MAX / step) + 1):
-            d = k * step
-            row, col = to_cell(x + d * math.cos(a), y + d * math.sin(a))
-            if not (0 <= row < walls.shape[0] and 0 <= col < walls.shape[1]):
-                break
-            if walls[row, col]:
-                dist = d
-                break
-        ranges.append(dist)
-    return ranges
+    t = np.arange(1, int(config.LIDAR_MAX / step) + 1) * step
+    angles = theta + math.pi - np.arange(count) * (2 * math.pi / count)
+    rows = np.floor((y + t[None, :] * np.sin(angles)[:, None] - gm.y0) / gm.res).astype(np.int64)
+    cols = np.floor((x + t[None, :] * np.cos(angles)[:, None] - gm.x0) / gm.res).astype(np.int64)
+    inside = (rows >= 0) & (rows < walls.shape[0]) & (cols >= 0) & (cols < walls.shape[1])
+    hit = np.zeros(rows.shape, bool)
+    hit[inside] = walls[rows[inside], cols[inside]]
+    # 지도 밖으로 나간 뒤의 표본은 무시 (빔 종료)
+    stop = hit | ~inside
+    first = stop.argmax(axis=1)
+    found = stop.any(axis=1) & hit[np.arange(count), first]
+    return np.where(found, t[first], np.inf).tolist()
 
 
 if __name__ == "__main__":

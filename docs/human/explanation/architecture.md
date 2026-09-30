@@ -19,7 +19,7 @@ sar-robot/
 │       └── viz.py             지도·궤적·구조 위치 그림 저장
 ├── controllers/hsv_tuner/     HSV 임계값 튜닝 컨트롤러 (sar_main/sar 사용)
 ├── controllers/tb3_*/         Intro 실습 컨트롤러 8개 (원본 유지)
-├── scripts/                   Webots PROTO·에셋 사전 캐시 스크립트
+├── scripts/                   Webots PROTO·에셋 사전 캐시, 경로 계획 성능 측정 스크립트
 ├── tests/                     pytest
 ├── worlds/*.wbt               Intro 실습 월드 7개
 ├── worlds/sar_dev.wbt         개발용 월드 (Intro breakroom_teleop_yolo 복사본)
