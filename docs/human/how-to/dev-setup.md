@@ -122,8 +122,19 @@ Webots R2025a는 월드의 PROTO·텍스처·메시를 raw.githubusercontent.com
 
 ### 6. 시뮬레이션 실행
 
-1. Webots에서 File > Open World로 `worlds/sar_dev.wbt`를 여십시오. 이미 열려 있으면 File > Reload World를 선택하십시오.
+1. Webots에서 File > Open World로 `worlds/sar_apartment.wbt`를 여십시오. 이미 열려 있으면 File > Reload World를 선택하십시오.
 2. 시뮬레이션을 시작하십시오. 로봇 컨트롤러는 `sar_main`입니다.
+
+`sar_apartment.wbt`는 대회 연습 맵 `apartment.wbt`에서 로봇 컨트롤러만 `sar_main`으로 바꾼 검증 월드입니다. 동작 검증은 이 월드로만 수행하십시오. `sar_dev.wbt`는 시작 위치가 `config.py`의 `START_*`와 다르고 빨간 사과가 1개뿐이라 과제 검증에 맞지 않습니다.
+
+GUI 없이 검증하려면 저장소 루트에서 다음 명령을 실행하십시오. 직접 실행한 프로세스만 PID로 종료하십시오.
+
+```bash
+/Applications/Webots.app/Contents/MacOS/webots --batch --mode=fast --minimize --stdout --stderr --port=1296 worlds/sar_apartment.wbt > webots.log 2>&1 &
+PID=$!
+# webots.log에서 "-> DONE" 확인 후
+kill $PID
+```
 
 Intro 실습 월드(`breakroom_teleop.wbt` 등)도 같은 방법으로 실행합니다.
 
@@ -132,8 +143,9 @@ Intro 실습 월드(`breakroom_teleop.wbt` 등)도 같은 방법으로 실행합
 - `pip check`: `No broken requirements found.`
 - 테스트: `17 passed` 이상 출력. Intro 저장소가 형제 폴더에 있으면 Intro 실습 파일 동기화 검사 포함
 - 에셋 스크립트: `619 URLs, ... 0 failed` 출력
-- 모듈 단독 테스트: `controllers/sar_main`에서 `../../.venv/bin/python -m sar.odometry` 실행 시 `odometry self-test ok` 출력
-- Webots 콘솔: 1초마다 `[t=1.1s] pose=(-0.30, -7.50, 3.14) lidar_points=360 front=...m` 형식의 로그 출력. pose 시작값은 `config.py`의 `START_X`, `START_Y`, `START_THETA`. 로봇은 정지 상태
+- 모듈 단독 테스트: `controllers/sar_main`에서 `../../.venv/bin/python -m sar.mission` 실행 시 `mission self-test ok` 출력
+- Webots 콘솔: 시작 회전 후 `나침반 보정 sign=... offset=...` 로그와 `[t=8.8s] INIT_SPIN -> EXPLORE (시작 회전 완료)` 형식의 상태 전환 로그 출력. 1초마다 `[t=...] <상태> pose=(x, y, theta) 구조 n/2 후보 k` 상태 로그 출력
+- 지도 그림: `controllers/sar_main/output/`에 `map_latest.png`(5초 주기), `map_rescue_<n>.png`(구조 시점), `map_final.png`(종료 시점) 저장
 
 | 증상 | 확인할 내용 |
 |---|---|

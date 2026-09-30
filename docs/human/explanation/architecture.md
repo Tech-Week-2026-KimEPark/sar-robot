@@ -10,6 +10,7 @@ sar-robot/
 │   ├── sar_main.py            Webots 진입점
 │   └── sar/                   팀 코드 패키지
 │       ├── config.py          모든 설정값
+│       ├── mission.py         상태 머신, 모듈 통합, 나침반 보정
 │       ├── robot_io.py        Webots 장치 접근
 │       ├── odometry.py        엔코더 오도메트리, 방향 칼만 필터
 │       ├── perception.py      대상 사과 검출, 거리·방위각, 연속 확인
@@ -22,12 +23,13 @@ sar-robot/
 ├── scripts/                   Webots PROTO·에셋 사전 캐시, 경로 계획 성능 측정 스크립트
 ├── tests/                     pytest
 ├── worlds/*.wbt               Intro 실습 월드 7개
-├── worlds/sar_dev.wbt         개발용 월드 (Intro breakroom_teleop_yolo 복사본)
+├── worlds/sar_apartment.wbt   검증 월드 (apartment.wbt 복사본, 컨트롤러 sar_main)
+├── worlds/sar_dev.wbt         개발용 월드 (Intro breakroom_teleop_yolo 복사본). 검증에 사용하지 않음
 ├── protos/                    목표 물체 사과 PROTO 4종
 └── models/YOLO/               YOLO 가중치 (Git 제외)
 ```
 
-`mission.py`는 기능을 구현할 때 `sar/`에 추가합니다. 파일 구조의 원본은 docs [과제와 구현 기준](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/reference/sar-과제-구현-기준.md) 7장(`CONTEXT.md` 기준)입니다. 담당 역할은 [역할과 담당 범위](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/reference/team/roles.md)에 있습니다.
+파일 구조의 원본은 docs [과제와 구현 기준](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/reference/sar-과제-구현-기준.md) 7장(`CONTEXT.md` 기준)입니다. 담당 역할은 [역할과 담당 범위](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/reference/team/roles.md)에 있습니다.
 
 ## 데이터 흐름
 
@@ -47,7 +49,7 @@ flowchart LR
   CTL -->|v, w| IO
 ```
 
-현재 미션 컨트롤러에 연결된 흐름은 `robot_io → odometry`와 로그 출력입니다. `perception`, `viz`, `grid_map`, `planner`, `local_control`은 구현되었지만 미션 루프에 아직 연결되지 않았습니다. 컨트롤러는 바퀴 속도 0을 유지합니다.
+`sar_main.py`는 모듈을 생성하고 매 step `Mission.tick()`을 호출합니다. `tick()`은 센서 → 오도메트리 → 지도 → 인식(`YOLO_EVERY` step마다) → 상태 머신 → 안전 필터 → 구동 순서로 처리합니다. 인식 결과는 `Confirm`으로 확정한 뒤 접근 대상이 됩니다. 상태 머신은 docs [mission 기능 설명](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/explanation/features/mission.md)에 있습니다.
 
 ## 구조 선택 이유
 
@@ -85,6 +87,8 @@ Webots의 `runtime.ini`는 사용하지 않습니다. `[python] COMMAND`는 상�
 
 속도, 임계값, 장치 이름을 `config.py` 1개에 모읍니다. 대회 월드의 장치 이름이나 로봇 크기가 다르면 이 파일만 수정합니다.
 
-## 개발용 월드
+## 검증 월드
 
-`worlds/sar_dev.wbt`는 Intro의 `breakroom_teleop_yolo.wbt`에서 컨트롤러 이름만 `sar_main`으로 바꾼 월드입니다. TurtleBot3 Burger에 카메라(640×480, 시야각 1.0472 rad)와 LDS-01 LiDAR가 장착되어 있고 사과 4종이 배치되어 있습니다. 대회 월드는 당일 제공되므로 이 월드는 개발·회귀 테스트용입니다.
+`worlds/sar_apartment.wbt`는 대회 연습 맵 `apartment.wbt`에서 로봇 컨트롤러만 `sar_main`으로 바꾼 월드입니다. 빨간 사과 2개, 다른 색 사과, 방해 물체, 보행자가 과제 조건과 같습니다. Webots 동작 검증은 이 월드로만 수행합니다. `apartment.wbt`는 Intro 원본과 같아야 하므로(동기화 검사) 컨트롤러를 바꾼 복사본을 사용합니다.
+
+`worlds/sar_dev.wbt`는 Intro의 `breakroom_teleop_yolo.wbt`에서 컨트롤러 이름만 `sar_main`으로 바꾼 월드입니다. TurtleBot3 Burger에 카메라(640×480, 시야각 1.0472 rad)와 LDS-01 LiDAR가 장착되어 있고 사과 4종이 배치되어 있습니다. 시작 위치가 `config.py`의 `START_*`와 다르고 빨간 사과가 1개뿐이라 검증에 사용하지 않습니다.

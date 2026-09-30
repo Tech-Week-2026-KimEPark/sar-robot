@@ -16,6 +16,8 @@
 - 팀 코드는 `controllers/sar_main/sar/`에 작성하십시오. Webots `controller` 모듈 import는 `sar/robot_io.py`에만 작성합니다.
 - 상수는 `controllers/sar_main/sar/config.py`에 정의하십시오.
 - `sar/` 모듈마다 `if __name__ == "__main__":` 단독 테스트를 작성하십시오.
+- Webots 동작 검증은 `worlds/sar_apartment.wbt`로만 수행하십시오. 이 월드는 대회 연습 맵 `apartment.wbt`에 `sar_main` 컨트롤러를 지정한 복사본입니다. `sar_dev.wbt` 등 다른 월드의 결과는 검증 결과로 보고하지 마십시오.
+- Webots를 헤드리스로 실행했다면 직접 실행한 프로세스만 PID로 종료하십시오. `pkill -f webots`처럼 이름으로 종료하면 다른 팀원·세션의 Webots도 종료됩니다.
 - `controllers/tb3_*`와 `requirements*.txt`의 Intro 기준 버전은 변경하지 마십시오.
 - 브랜치 이름은 `<type>/<내용>` 형식입니다. AI 도구 이름을 넣지 마십시오.
 - 작업을 마치기 전에 저장소 루트에서 다음 명령을 실행하십시오.
@@ -24,6 +26,15 @@
 .venv/bin/ruff format .
 .venv/bin/ruff check .
 .venv/bin/python -m pytest -q
+```
+
+Webots 헤드리스 검증은 저장소 루트에서 다음 순서로 실행하십시오. macOS 경로 기준입니다. 절차와 결과 확인은 [개발 환경 설정](docs/human/how-to/dev-setup.md) 6장에 있습니다.
+
+```bash
+/Applications/Webots.app/Contents/MacOS/webots --batch --mode=fast --minimize --stdout --stderr --port=1296 worlds/sar_apartment.wbt > webots.log 2>&1 &
+PID=$!
+# 로그에서 "-> DONE" 확인 후 직접 실행한 프로세스만 종료
+kill $PID
 ```
 
 <!-- devdog-docs:begin docs-layout -->

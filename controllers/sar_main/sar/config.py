@@ -58,6 +58,23 @@ PATH_STEP = 0.10  # m, 반환 경로의 점 간격
 BLACKLIST_RADIUS = 0.5  # m, 블랙리스트 좌표 주변 프론티어 제외 반경
 FRONTIER_MIN_DIST = 0.3  # m, 이보다 가까운 프론티어 칸은 목표에서 제외 (제자리 목표 방지)
 
+# 미션 상태 머신 (CONTEXT.md 7장)
+INIT_SPIN_W = 0.8  # rad/s, 시작 제자리 회전 속도 (1회전 약 7.9초)
+COMPASS_SCALE_TOL = 0.5  # 오도메트리/나침반 회전 비율이 1에서 이만큼 벗어나면 나침반 미사용
+REPLAN_PERIOD = 2.0  # s, 프론티어 선택·경로 재계획 주기
+FRONTIER_TIMEOUT = 30.0  # s, 같은 프론티어 목표에 도달하지 못하면 블랙리스트
+APPROACH_TIMEOUT = 60.0  # s, 대상 접근 제한 시간
+RESCUE_HOLD = 2.0  # s, 구조 정지 시간
+RETURN_TOL = 0.12  # m, 시작점 도착 판정 반경
+FACE_TOL = 0.1  # rad, 대상·목표 정면 정렬 허용 오차
+FACE_GAIN = 1.5  # 1/s, 정렬 각속도 = 이득 × 방위각
+CANDIDATE_DROP_DIST = 0.8  # m, 후보 위치에 이 거리까지 접근해도 확정되지 않으면 후보 삭제
+STUCK_TIME, STUCK_DIST = 4.0, 0.05  # s, m. 이 시간 동안 이 거리 미만 이동이면 RECOVERY
+BLOCKED_TIME = 3.0  # s, 안전 필터 연속 차단 시 재계획
+RECOVERY_BACK_TIME = 1.0  # s, RECOVERY 후진 시간
+RECOVERY_TURN_TIME = 1.5  # s, RECOVERY 회전 시간
+TRAJ_STEP = 0.10  # m, 주행 궤적 기록 간격
+
 # 위치 추정
 HEADING_Q = 0.01**2  # 방향 예측 잡음 (한 스텝, rad^2)
 HEADING_R = 0.05**2  # 나침반 관측 잡음 (rad^2)
