@@ -4,5 +4,6 @@
 
 ## 목록
 
+- [Intro 과정 환경 기준](intro-environment.md)
 - [코드 작성 규칙](code-conventions.md)
 - [모듈 인터페이스](interfaces.md)

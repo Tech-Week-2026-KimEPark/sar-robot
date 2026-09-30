@@ -6,9 +6,9 @@ sar-robot 저장소의 Python 코드 작성 규칙입니다. 규칙 중 자동 �
 
 | 항목 | 설정 | 확인 명령 |
 |---|---|---|
-| Python 버전 | 3.12 (`pyproject.toml`의 `requires-python`) | `.venv/bin/python --version` |
+| Python 버전 | 3.10 (`pyproject.toml`의 `requires-python`, [Intro 과정 환경 기준](intro-environment.md)) | `.venv/bin/python --version` |
 | 코드 형식 | ruff format, 줄 길이 100 | `.venv/bin/ruff format --check .` |
-| 린트 | ruff 규칙 `E`, `F`, `I`, `B`, `UP` | `.venv/bin/ruff check .` |
+| 린트 | ruff 규칙 `E`, `F`, `I`, `B`, `UP`. Intro 원본 `controllers/tb3_*` 제외 | `.venv/bin/ruff check .` |
 | 테스트 | pytest, `src/`를 import 경로에 추가 | `.venv/bin/python -m pytest -q` |
 
 CI(`.github/workflows/ci.yml`)는 PR과 `main` push마다 위 3개 검사를 실행합니다. 검사에 실패한 PR은 머지하지 않습니다.
@@ -19,7 +19,8 @@ CI(`.github/workflows/ci.yml`)는 PR과 `main` push마다 위 3개 검사를 실
 |---|---|
 | `src/sar/<모듈>/` | 알고리즘과 로직. Webots 없이 실행 가능해야 함 |
 | `src/sar/robot_io.py` | Webots 장치 접근. `controller` 모듈 import는 이 파일에만 허용 |
-| `controllers/<이름>/<이름>.py` | Webots 진입점. `.venv` 재실행, `RobotIO` 생성, 루프만 작성 |
+| `controllers/<이름>/<이름>.py` | Webots 진입점. `RobotIO` 생성과 루프만 작성 |
+| `controllers/tb3_*/` | Intro 원본 실습 컨트롤러. 수정하지 않음 |
 | `scripts/` | 개발 보조 스크립트. 테스트는 `tests/`에 작성 |
 | `src/sar/config.py` | 상수 전체 |
 | `tests/test_<모듈>.py` | 모듈별 pytest |
@@ -27,8 +28,8 @@ CI(`.github/workflows/ci.yml`)는 PR과 `main` push마다 위 3개 검사를 실
 - `src/sar/` 모듈에서 `from controller import ...`를 사용하지 않음. 테스트와 CI에 Webots가 없기 때문임
 - 모듈 사이 호출은 [모듈 인터페이스](interfaces.md)에 정의한 함수만 사용함
 - 순환 import가 생기면 공통 타입을 `geometry.py`로 옮김
-- 컨트롤러 파일의 `.venv` 재실행 전 코드는 Python 3.9 문법만 사용함. macOS Webots가 `/usr/bin/python3`(3.9)로 먼저 실행하기 때문임
-- 새 컨트롤러는 `controllers/sar_mission/sar_mission.py`의 `use_venv_python()`과 `sys.path` 설정을 복사해 시작함
+- 새 패키지 의존성은 Intro 고정 버전(numpy 1.23.5 등)과 함께 설치해 `pip check` 통과를 확인한 뒤 버전을 고정함
+- Intro 실습 컨트롤러를 변경해야 하면 `tb3_*`를 수정하지 말고 새 컨트롤러 폴더로 복사해 작업함
 
 ## 이름 규칙
 

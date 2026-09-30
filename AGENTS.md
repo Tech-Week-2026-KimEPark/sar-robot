@@ -2,7 +2,7 @@
 
 ## 코드 작업
 
-2026 부산대 TECH WEEK Autonomous Search and Rescue 해커톤 팀 코드입니다. Webots R2025a와 Python 3.12를 사용합니다.
+2026 부산대 TECH WEEK Autonomous Search and Rescue 해커톤 팀 코드입니다. Webots R2025a와 Python 3.10을 사용합니다. 패키지 버전은 Intro 과정 기준입니다([Intro 과정 환경 기준](docs/human/reference/intro-environment.md)).
 
 | 작업 전 확인 | 문서 |
 |---|---|
@@ -14,6 +14,7 @@
 
 - `src/sar/`에서 Webots `controller` 모듈을 import하지 마십시오. Webots 접근은 `src/sar/robot_io.py`에만 작성합니다.
 - 상수는 `src/sar/config.py`에 정의하십시오.
+- `controllers/tb3_*`와 `requirements*.txt`의 Intro 기준 버전은 변경하지 마십시오.
 - 브랜치 이름은 `<type>/<내용>` 형식입니다. AI 도구 이름을 넣지 마십시오.
 - 작업을 마치기 전에 저장소 루트에서 다음 명령을 실행하십시오.
 

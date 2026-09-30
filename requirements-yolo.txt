@@ -1,2 +1,5 @@
+# Intro 과정 노트북 기준 PyTorch 버전. Linux CPU 전용 설치는 docs/human/how-to/dev-setup.md 참고
 -r requirements.txt
-ultralytics
+torch==2.8.0
+torchvision==0.23.0
+ultralytics==8.4.166

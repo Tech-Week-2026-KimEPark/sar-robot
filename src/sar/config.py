@@ -4,6 +4,7 @@
 WHEEL_RADIUS = 0.033  # m
 WHEEL_SEPARATION = 0.160  # m
 MAX_WHEEL_SPEED = 6.67  # rad/s, RotationalMotor maxVelocity
+ROBOT_RADIUS = 0.105  # m, Intro 과정 노트북 핵심 파라미터
 
 # 장치 이름 (Intro 실습 월드 기준)
 LIDAR_NAME = "LDS-01"
