@@ -50,6 +50,16 @@
 5. 완료 보고에 갱신한 문서와 검사 결과를 포함하십시오. 문서 변경이 불필요한 경우에는 이유를 적으십시오. 접근 제한으로 갱신하지 못했다면 미완료 항목으로 보고하십시오.
 <!-- devdog-docs:end docs-update -->
 
+## 기능 구현 문서
+
+기능 1개를 구현하면 같은 작업에서 docs 저장소에 기능 문서를 작성하십시오. 사용자의 별도 요청을 기다리지 마십시오. 기능은 `controllers/sar_main/sar/` 모듈 추가, 공개 함수·클래스 추가, 공개 함수의 동작 변경, 컨트롤러 추가입니다.
+
+1. 작성 대상과 구성은 docs [기능 문서](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/explanation/features/README.md)(로컬 `../docs/human/explanation/features/README.md`)를 따르십시오.
+2. 문서 위치는 `../docs/human/explanation/features/<모듈 이름>.md`입니다. 같은 모듈 문서가 있으면 기존 문서를 갱신하십시오.
+3. 검증 결과에는 실행한 명령과 결과만 적으십시오. 실행하지 않은 항목은 "미확인"으로 구분하십시오.
+4. docs 저장소에서 `python3 scripts/check_docs.py --write-catalog`와 `python3 scripts/check_docs.py --workspace`를 실행하십시오.
+5. docs 변경은 docs 저장소의 `docs/<모듈 이름>-feature` 브랜치와 PR로 올리고, sar-robot PR 본문에 docs PR 링크를 적으십시오.
+
 <!-- devdog-docs:begin incident -->
 ## 장애 기록
 
