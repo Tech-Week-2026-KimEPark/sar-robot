@@ -9,6 +9,11 @@
 - [ ] 인지 (`sar/perception.py`, `sar/viz.py`, `controllers/hsv_tuner/`)
 - [ ] 행동 (`sar/odometry.py`, `sar/local_control.py`)
 
+## 기능 문서
+
+- [ ] 해당 없음 (오타·주석·형식·테스트만 변경)
+- [ ] docs 기능 문서 작성·갱신. docs PR 링크:
+
 ## 인터페이스 변경
 
 - [ ] 없음
