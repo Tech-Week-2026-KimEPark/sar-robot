@@ -4,3 +4,5 @@ __pycache__/
 .ruff_cache/
 models/YOLO/*.pt
 *.egg-info/
+controllers/*/output/
+controllers/*/frames/
