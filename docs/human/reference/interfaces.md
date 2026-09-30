@@ -21,6 +21,7 @@ sar-robot 모듈의 구현 상태와 코드 위치를 정리한 문서입니다.
 | `sar/odometry.py` | `Odometry.pose()` | 없음 | `(x, y, theta)` |
 | `sar/odometry.py` | `Odometry.heading_var()` | 없음 | 방향 분산 P [rad²] |
 | `sar/odometry.py` | `Odometry.correct(dx, dy, dth)` | 보정값 [m, m, rad] | 없음 |
+| `sar/odometry.py` | `Odometry.set_wheel_separation_scale(scale)` | 스케일 배율 (기본 1.0) | 없음. 이후 `update()`의 회전각(dth) 계산에만 반영. `mission.fit_compass()`가 INIT_SPIN에서 측정한 오도메트리/나침반 회전 비율을 전달 |
 | `sar/perception.py` | `TargetDetector(color, model_path)` | 대상 색(`HSV_RANGES` 키), YOLO 가중치 경로 또는 `None` | 검출기. YOLO는 생성 시 1회 로드 |
 | `sar/perception.py` | `TargetDetector.detect(bgr)` | BGR 이미지 또는 `None` | 가장 가까운 대상 검출 결과 `dict` 또는 `None` |
 | `sar/perception.py` | `TargetDetector.detect_all(bgr)` | BGR 이미지 또는 `None` | 대상 검출 결과 목록. 가까운 순서 |

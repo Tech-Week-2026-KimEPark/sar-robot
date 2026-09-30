@@ -23,6 +23,15 @@ class Odometry:
         self.x, self.y, self.theta = x, y, wrap(theta)
         self.p = 0.0  # 방향 분산 [rad^2]. 시작 방향은 알고 있으므로 0
         self._last: tuple[float, float] | None = None
+        # 회전 스케일 보정. mission.fit_compass()가 INIT_SPIN에서 측정한
+        # "엔코더/나침반 회전 비율"을 set_wheel_separation_scale()로 전달받으면
+        # 회전각(dth) 계산에만 반영한다. 직진 거리(ds)는 별도 확인(WHEEL_RADIUS
+        # 실측 비율 1.0007)에서 편향이 없었으므로 그대로 둔다.
+        self._sep_scale = 1.0
+
+    def set_wheel_separation_scale(self, scale: float) -> None:
+        """엔코더 기반 회전각의 스케일 보정값을 설정. 기본 1.0(보정 없음)."""
+        self._sep_scale = scale
 
     def update(self, enc_l: float, enc_r: float, compass: float | None = None) -> None:
         """누적 바퀴 회전각 [rad]으로 pose 갱신. compass는 보정된 나침반 방향 [rad]."""
@@ -30,7 +39,7 @@ class Odometry:
             d_l = (enc_l - self._last[0]) * config.WHEEL_RADIUS
             d_r = (enc_r - self._last[1]) * config.WHEEL_RADIUS
             ds = (d_r + d_l) / 2
-            dth = (d_r - d_l) / config.WHEEL_SEPARATION
+            dth = (d_r - d_l) / (config.WHEEL_SEPARATION * self._sep_scale)
             if abs(dth) < _STRAIGHT_EPS:
                 fx, fy = ds, 0.0
             else:
@@ -72,4 +81,14 @@ if __name__ == "__main__":
     predicted = odom.heading_var() + config.HEADING_Q  # 다음 호출의 예측 분산
     odom.update(10.0, 10.0, compass=0.1)  # 나침반 갱신 시 방향이 z 쪽으로 이동, 분산 감소
     assert 0.0 < odom.pose()[2] < 0.1 and odom.heading_var() < predicted
+
+    # 회전 스케일 보정: scale > 1이면 같은 바퀴 회전각 차이에서 dth가 줄어듦
+    plain = Odometry(0.0, 0.0, 0.0)
+    plain.update(0.0, 0.0)
+    plain.update(-1.0, 1.0)
+    scaled = Odometry(0.0, 0.0, 0.0)
+    scaled.set_wheel_separation_scale(1.104)
+    scaled.update(0.0, 0.0)
+    scaled.update(-1.0, 1.0)
+    assert abs(scaled.pose()[2]) < abs(plain.pose()[2])
     print("odometry self-test ok")
