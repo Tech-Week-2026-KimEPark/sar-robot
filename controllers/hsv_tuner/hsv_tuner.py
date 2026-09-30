@@ -14,13 +14,17 @@ OpenCV 창에서 로봇을 조종하며 트랙바로 HSV 범위를 조정한다.
 """
 
 import os
+import sys
 
 import cv2
 import numpy as np
 
-from sar import config
-from sar.perception import TargetDetector, color_mask
-from sar.robot_io import RobotIO
+# 팀 패키지 sar는 controllers/sar_main/에 있음. Webots는 이 컨트롤러 폴더만 import 경로에 포함
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sar_main"))
+
+from sar import config  # noqa: E402
+from sar.perception import TargetDetector, color_mask  # noqa: E402
+from sar.robot_io import RobotIO  # noqa: E402
 
 WINDOW = "hsv_tuner"
 TRACKBARS = [
@@ -88,6 +92,8 @@ def main() -> None:
     detections: list[dict] = []
     while io.step():
         frame = io.camera_bgr()
+        if frame is None:
+            continue
         values = [cv2.getTrackbarPos(name, WINDOW) for name, _ in TRACKBARS]
         detector.ranges = ranges_from_values(values)
         if step % config.YOLO_EVERY == 0:
@@ -113,10 +119,9 @@ def main() -> None:
         elif key == ord("q"):
             break
 
-        half_track = w * config.WHEEL_SEPARATION / 2
-        io.set_wheel_speeds(v - half_track, v + half_track)
+        io.drive(v, w)
 
-    io.set_wheel_speeds(0.0, 0.0)
+    io.drive(0.0, 0.0)
     cv2.destroyAllWindows()
 
 

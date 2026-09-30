@@ -12,8 +12,10 @@
 | 브랜치·커밋·PR 규칙 | [Git 작업 규칙](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/reference/team/git-workflow.md) |
 | 대회 형식·채점 기준 | 저장소 루트 `CONTEXT.md` (대회 당일 작성) |
 
-- `src/sar/`에서 Webots `controller` 모듈을 import하지 마십시오. Webots 접근은 `src/sar/robot_io.py`에만 작성합니다.
-- 상수는 `src/sar/config.py`에 정의하십시오.
+- 파일 구조와 모듈 인터페이스는 `CONTEXT.md` 기준입니다. 원본은 docs [과제와 구현 기준](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/reference/sar-과제-구현-기준.md) 7장입니다.
+- 팀 코드는 `controllers/sar_main/sar/`에 작성하십시오. Webots `controller` 모듈 import는 `sar/robot_io.py`에만 작성합니다.
+- 상수는 `controllers/sar_main/sar/config.py`에 정의하십시오.
+- `sar/` 모듈마다 `if __name__ == "__main__":` 단독 테스트를 작성하십시오.
 - `controllers/tb3_*`와 `requirements*.txt`의 Intro 기준 버전은 변경하지 마십시오.
 - 브랜치 이름은 `<type>/<내용>` 형식입니다. AI 도구 이름을 넣지 마십시오.
 - 작업을 마치기 전에 저장소 루트에서 다음 명령을 실행하십시오.

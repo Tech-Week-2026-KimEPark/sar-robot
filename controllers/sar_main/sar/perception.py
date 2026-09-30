@@ -16,7 +16,6 @@ import cv2
 import numpy as np
 
 from sar import config
-from sar.geometry import Pose
 
 HsvRange = tuple[tuple[int, int, int], tuple[int, int, int]]
 
@@ -89,16 +88,9 @@ def find_color_blobs(mask: np.ndarray) -> list[dict]:
     return blobs
 
 
-def _pose_tuple(pose: Pose | Sequence[float]) -> tuple[float, float, float]:
-    if isinstance(pose, Pose):
-        return pose.x, pose.y, pose.theta
+def to_world(det: dict, pose: Sequence[float]) -> tuple[float, float]:
+    """검출 결과의 거리·방위각과 로봇 pose (x, y, theta)로 대상 월드 좌표 (x, y) 계산."""
     x, y, theta = pose
-    return x, y, theta
-
-
-def to_world(det: dict, pose: Pose | Sequence[float]) -> tuple[float, float]:
-    """검출 결과의 거리·방위각과 로봇 pose로 대상 월드 좌표 (x, y) 계산."""
-    x, y, theta = _pose_tuple(pose)
     angle = theta + det["bearing"]
     return x + det["dist"] * math.cos(angle), y + det["dist"] * math.sin(angle)
 
@@ -214,7 +206,7 @@ class TargetDetector:
         detections = self.detect_all(bgr)
         return detections[0] if detections else None
 
-    def to_world(self, det: dict, pose: Pose | Sequence[float]) -> tuple[float, float]:
+    def to_world(self, det: dict, pose: Sequence[float]) -> tuple[float, float]:
         """검출 결과의 대상 월드 좌표 (x, y) [m]."""
         return to_world(det, pose)
 

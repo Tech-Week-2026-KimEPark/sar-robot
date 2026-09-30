@@ -4,10 +4,10 @@
 
 ## 담당 모듈
 
-- [ ] A 통합 (`mission/`, `robot_io.py`, `config.py`)
-- [ ] B 탐색·경로 (`mapping/`, `planning/`)
-- [ ] C 인식 (`perception/`)
-- [ ] D 제어 (`control/`, `localization/`)
+- [ ] 통합 (`sar_main.py`, `sar/mission.py`, `sar/robot_io.py`, `sar/config.py`)
+- [ ] 계획 (`sar/grid_map.py`, `sar/planner.py`)
+- [ ] 인지 (`sar/perception.py`, `sar/viz.py`, `controllers/hsv_tuner/`)
+- [ ] 행동 (`sar/odometry.py`, `sar/local_control.py`)
 
 ## 인터페이스 변경
 

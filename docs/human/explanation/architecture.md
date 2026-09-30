@@ -6,17 +6,17 @@ sar-robot의 폴더 구성, 모듈 사이 데이터 흐름, 구조를 선택한 
 
 ```text
 sar-robot/
-├── controllers/sar_mission/   팀 미션 컨트롤러
-├── controllers/hsv_tuner/     HSV 임계값 튜닝 컨트롤러
+├── controllers/sar_main/      팀 컨트롤러 (제출 단위)
+│   ├── sar_main.py            Webots 진입점
+│   └── sar/                   팀 코드 패키지
+│       ├── config.py          모든 설정값
+│       ├── robot_io.py        Webots 장치 접근
+│       ├── odometry.py        엔코더 오도메트리, 방향 칼만 필터
+│       ├── perception.py      대상 사과 검출, 거리·방위각, 연속 확인
+│       └── viz.py             지도·궤적·구조 위치 그림 저장
+├── controllers/hsv_tuner/     HSV 임계값 튜닝 컨트롤러 (sar_main/sar 사용)
 ├── controllers/tb3_*/         Intro 실습 컨트롤러 8개 (원본 유지)
 ├── scripts/                   Webots PROTO·에셋 사전 캐시 스크립트
-├── src/sar/                   팀 코드 패키지
-│   ├── config.py              상수
-│   ├── geometry.py            좌표 규칙, Pose, 좌표 변환
-│   ├── robot_io.py            Webots 장치 접근
-│   ├── perception.py          대상 사과 검출, 거리·방위각, 연속 확인
-│   ├── viz.py                 지도·궤적·구조 위치 그림 저장
-│   └── localization/          Wheel Odometry
 ├── tests/                     pytest
 ├── worlds/*.wbt               Intro 실습 월드 7개
 ├── worlds/sar_dev.wbt         개발용 월드 (Intro breakroom_teleop_yolo 복사본)
@@ -24,7 +24,7 @@ sar-robot/
 └── models/YOLO/               YOLO 가중치 (Git 제외)
 ```
 
-`mapping/`, `planning/`, `control/`, `mission/` 폴더는 기능을 구현할 때 추가합니다. 담당 역할은 [역할과 담당 범위](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/reference/team/roles.md)에 있습니다.
+`mission.py`, `grid_map.py`, `planner.py`, `local_control.py`는 기능을 구현할 때 `sar/`에 추가합니다. 파일 구조의 원본은 docs [과제와 구현 기준](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/reference/sar-과제-구현-기준.md) 7장(`CONTEXT.md` 기준)입니다. 담당 역할은 [역할과 담당 범위](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/reference/team/roles.md)에 있습니다.
 
 ## 데이터 흐름
 
@@ -32,31 +32,31 @@ sar-robot/
 
 ```mermaid
 flowchart LR
-  IO[RobotIO] -->|바퀴 회전각| LOC[localization]
-  IO -->|LiDAR 거리| MAP[mapping]
+  IO[robot_io] -->|바퀴 회전각, 나침반| ODO[odometry]
+  IO -->|LiDAR 거리| MAP[grid_map]
   IO -->|BGR 이미지| PER[perception]
-  LOC -->|Pose| MAP
-  LOC -->|Pose| MIS[mission]
-  MAP -->|격자 지도| PLN[planning]
+  ODO -->|pose| MAP
+  ODO -->|pose| MIS[mission]
+  MAP -->|격자 지도| PLN[planner]
   PER -->|대상 검출 결과| MIS
   PLN -->|경로| MIS
-  MIS -->|목표점| CTL[control]
+  MIS -->|경로| CTL[local_control]
   CTL -->|v, w| IO
 ```
 
-현재 미션 컨트롤러에 연결된 흐름은 `RobotIO → localization`과 로그 출력입니다. `perception`과 `viz`는 구현되었지만 미션 루프에 아직 연결되지 않았습니다. 컨트롤러는 바퀴 속도 0을 유지합니다.
+현재 미션 컨트롤러에 연결된 흐름은 `robot_io → odometry`와 로그 출력입니다. `perception`과 `viz`는 구현되었지만 미션 루프에 아직 연결되지 않았습니다. 컨트롤러는 바퀴 속도 0을 유지합니다.
 
 ## 구조 선택 이유
 
-### 컨트롤러와 패키지 분리
+### 컨트롤러 폴더 안의 패키지
 
-Webots는 `controllers/<이름>/<이름>.py`를 실행합니다. 로직을 이 파일에 작성하면 Webots 없이 테스트할 수 없습니다. 팀 코드는 `src/sar/` 패키지에 작성하고 컨트롤러는 루프만 담당합니다. `from controller import ...`는 `robot_io.py`에만 두므로 나머지 모듈은 pytest와 CI에서 실행됩니다.
+Webots는 `controllers/<이름>/<이름>.py`를 실행하고 컨트롤러 폴더를 import 경로에 포함합니다. 팀 코드를 `controllers/sar_main/sar/`에 두면 `from sar import ...`가 별도 설치 없이 동작합니다. 컨트롤러 폴더 1개가 제출 단위가 되므로 평가 환경에서 패키지 설치 절차가 필요하지 않습니다.
 
-### Webots Python과 패키지 등록
+로직을 진입점 파일에 작성하면 Webots 없이 테스트할 수 없습니다. 진입점 `sar_main.py`는 루프만 담당하고 로직은 `sar/` 모듈에 작성합니다. `from controller import ...`는 `robot_io.py`의 `RobotIO` 생성 시점에만 실행하므로 나머지 모듈과 `wheel_speeds()`는 pytest와 CI에서 실행됩니다. pytest는 `pyproject.toml`의 `pythonpath`로 Webots와 같은 import 경로를 사용합니다.
+
+### Webots Python
 
 Intro 과정은 Webots와 노트북이 같은 Python 3.10 환경을 사용합니다. sar-robot도 같은 구조를 사용합니다. Webots Preferences의 Python command를 저장소 `.venv`의 Python으로 설정하면 Intro 실습 컨트롤러와 팀 컨트롤러가 같은 패키지 버전으로 실행됩니다.
-
-팀 코드는 `pip install -e .`로 가상환경에 등록합니다. 컨트롤러 폴더 위치와 관계없이 `from sar import ...`가 동작하므로 컨트롤러에 import 경로 설정 코드가 필요하지 않습니다.
 
 Webots의 `runtime.ini`는 사용하지 않습니다. `[python] COMMAND`는 상대 경로를 인식하지 않습니다(Webots R2025a에서 `"../../.venv/bin/python" was not found` 확인). 절대 경로는 PC마다 다르므로 저장소에 포함할 수 없습니다.
 
@@ -74,9 +74,9 @@ Webots의 `runtime.ini`는 사용하지 않습니다. `[python] COMMAND`는 상�
 
 템플릿 변수 값은 월드마다 다르므로 폴더 안의 같은 패턴 파일을 모두 받습니다. 2026-09-30 기준 대상 폴더는 8개이며 폴더 전체 크기는 약 67 MB입니다.
 
-### 모듈별 폴더
+### 기능별 파일
 
-역할 4개가 서로 다른 폴더를 수정하므로 머지 충돌이 줄어듭니다. 모듈 사이 호출은 인터페이스 문서의 함수로 제한합니다. 따라서 담당자가 내부 구현을 바꿔도 다른 모듈을 수정하지 않습니다.
+역할 4개가 서로 다른 파일을 수정하므로 머지 충돌이 줄어듭니다. 모듈 사이 호출은 인터페이스 문서의 함수로 제한합니다. 따라서 담당자가 내부 구현을 바꿔도 다른 모듈을 수정하지 않습니다.
 
 ### 상수 파일 1개
 
@@ -84,4 +84,4 @@ Webots의 `runtime.ini`는 사용하지 않습니다. `[python] COMMAND`는 상�
 
 ## 개발용 월드
 
-`worlds/sar_dev.wbt`는 Intro의 `breakroom_teleop_yolo.wbt`에서 컨트롤러 이름만 `sar_mission`으로 바꾼 월드입니다. TurtleBot3 Burger에 카메라(640×480, 시야각 1.0472 rad)와 LDS-01 LiDAR가 장착되어 있고 사과 4종이 배치되어 있습니다. 대회 월드는 당일 제공되므로 이 월드는 개발·회귀 테스트용입니다.
+`worlds/sar_dev.wbt`는 Intro의 `breakroom_teleop_yolo.wbt`에서 컨트롤러 이름만 `sar_main`으로 바꾼 월드입니다. TurtleBot3 Burger에 카메라(640×480, 시야각 1.0472 rad)와 LDS-01 LiDAR가 장착되어 있고 사과 4종이 배치되어 있습니다. 대회 월드는 당일 제공되므로 이 월드는 개발·회귀 테스트용입니다.

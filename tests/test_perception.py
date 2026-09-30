@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 
 from sar import config
-from sar.geometry import Pose
 from sar.perception import (
     Confirm,
     TargetDetector,
@@ -201,9 +200,9 @@ def test_to_world():
     det = {"dist": 2.0, "bearing": 0.0}
     assert to_world(det, (1.0, 2.0, math.pi / 2)) == pytest.approx((1.0, 4.0))
     det = {"dist": 1.0, "bearing": math.pi / 2}  # 정면 기준 왼쪽 90°
-    assert to_world(det, Pose(0.0, 0.0, 0.0)) == pytest.approx((0.0, 1.0))
+    assert to_world(det, (0.0, 0.0, 0.0)) == pytest.approx((0.0, 1.0))
     detector = TargetDetector("red", model_path=None)
-    assert detector.to_world(det, Pose()) == pytest.approx((0.0, 1.0))
+    assert detector.to_world(det, (0.0, 0.0, 0.0)) == pytest.approx((0.0, 1.0))
 
 
 def test_is_excluded():

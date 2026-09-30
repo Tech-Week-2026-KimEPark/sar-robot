@@ -126,7 +126,7 @@ if __name__ == "__main__":
     demo[50, 50:150] = demo[149, 50:150] = demo[50:150, 50] = demo[50:150, 149] = 1
 
     def demo_cell(x: float, y: float) -> tuple[int, int]:
-        return int(y / config.GRID_RESOLUTION) + 100, int(x / config.GRID_RESOLUTION) + 100
+        return int(y / config.MAP_RES) + 100, int(x / config.MAP_RES) + 100
 
     img = render_map(
         demo,
