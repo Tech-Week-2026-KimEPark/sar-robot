@@ -112,7 +112,8 @@ def test_safety_filter_cone_covers_robot_width_at_stop_dist():
     assert half_width >= config.ROBOT_RADIUS + config.SAFETY_MARGIN - 1e-9
 
 
-def test_safety_filter_slows_down_before_stop_dist():
+def test_safety_filter_slows_down_before_stop_dist(monkeypatch):
+    monkeypatch.setattr(config, "NEAR_SLOWDOWN", True)
     # 대피 인원 이동 대응(과제와 구현 기준 12장): 정지 거리 도달 전부터 서서히 감속
     ranges = [3.0] * 360
     mid = (config.STOP_DIST + _SLOW_DIST) / 2
@@ -136,7 +137,8 @@ def test_safety_filter_full_stop_scales_to_zero():
     assert v == pytest.approx(0.0, abs=1e-3)
 
 
-def test_safety_filter_yields_toward_open_side():
+def test_safety_filter_yields_toward_open_side(monkeypatch):
+    monkeypatch.setattr(config, "NEAR_SLOWDOWN", True)
     # 오른쪽(270 방향)만 막혀 있으면 왼쪽으로 살짝 틀어 통로를 양보함(w 증가).
     # 180은 좌우 콘의 경계라 왼쪽에도 포함되므로 건드리지 않음
     ranges = [3.0] * 360

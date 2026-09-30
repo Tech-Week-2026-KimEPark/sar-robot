@@ -119,7 +119,7 @@ def safety_filter(v: float, w: float, ranges: list[float] | None) -> tuple[float
     if nearest < config.STOP_DIST:
         return 0.0, w, True
 
-    if nearest < _SLOW_DIST:
+    if config.NEAR_SLOWDOWN and nearest < _SLOW_DIST:
         scale = (nearest - config.STOP_DIST) / (_SLOW_DIST - config.STOP_DIST)
         yield_w = _YIELD_GAIN * (left_min - right_min)  # 오른쪽이 좁으면 음수(우회전)
         return v * scale, max(-config.W_MAX, min(config.W_MAX, w + yield_w)), False
