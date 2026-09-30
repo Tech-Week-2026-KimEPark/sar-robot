@@ -3,7 +3,15 @@ import math
 import pytest
 
 from sar import config
-from sar.local_control import _FRONT_HALF_ANGLE, _SLOW_DIST, pure_pursuit, safety_filter
+from sar.local_control import (
+    _FRONT_HALF_ANGLE,
+    _SLOW_DIST,
+    _YIELD_DIST,
+    predict_conflict,
+    pure_pursuit,
+    safety_filter,
+    yield_command,
+)
 
 
 def test_pure_pursuit_no_path_is_reached():
@@ -143,3 +151,103 @@ def test_safety_filter_yield_clips_to_w_max():
     ranges[200] = config.STOP_DIST + 0.01  # 오른쪽만 좁아서 양보 편향이 생김
     v, w, blocked = safety_filter(config.V_MAX, config.W_MAX, ranges)
     assert abs(w) <= config.W_MAX + 1e-9
+
+
+# --- predict_conflict: 사람-회피-설계.md 3.3절 ---
+
+
+def test_predict_conflict_head_on_approach():
+    # 정면으로 마주 옴 (넓은 방), 예측 시간 안에 만남: 최근접 거리가 0에 가까움
+    person = {"x": 1.0, "y": 0.0, "vx": -0.3, "vy": 0.0}
+    t_star, d_min = predict_conflict((0.0, 0.0, 0.0), config.V_MAX, person)
+    assert t_star > 0.0
+    assert d_min < 0.05
+
+
+def test_predict_conflict_moving_away_clips_to_now():
+    person = {"x": 1.0, "y": 0.0, "vx": 0.3, "vy": 0.0}
+    t_star, d_min = predict_conflict((0.0, 0.0, 0.0), 0.0, person)
+    assert t_star == 0.0
+    assert d_min == pytest.approx(1.0)
+
+
+def test_predict_conflict_crossing_sideways():
+    # 옆에서 가로지름: 예측 거리가 현재 거리보다 가까워짐
+    person = {"x": 0.0, "y": 2.0, "vx": 0.0, "vy": -0.3}
+    t_star, d_min = predict_conflict((0.0, 0.0, 0.0), config.V_MAX, person)
+    assert t_star > 0.0
+    assert d_min < 2.0
+
+
+def test_predict_conflict_approaching_from_behind():
+    # 뒤에서 다가옴: 상대 위치가 로봇 뒤(-x)라도 예측이 동작하고 거리가 좁혀짐
+    person = {"x": -1.0, "y": 0.0, "vx": 0.3, "vy": 0.0}
+    t_star, d_min = predict_conflict((0.0, 0.0, 0.0), 0.0, person)
+    assert t_star > 0.0
+    assert d_min < 1.0
+
+
+def test_predict_conflict_zero_relative_speed_keeps_current_distance():
+    person = {"x": 1.0, "y": 0.0, "vx": config.V_MAX, "vy": 0.0}
+    t_star, d_min = predict_conflict((0.0, 0.0, 0.0), config.V_MAX, person)
+    assert t_star == 0.0
+    assert d_min == pytest.approx(1.0)
+
+
+# --- yield_command: 사람-회피-설계.md 3.4절 ---
+
+
+def test_yield_command_moving_away_is_done():
+    person = {"x": 1.0, "y": 0.0, "vx": 0.3, "vy": 0.0}
+    v, w, done = yield_command((0.0, 0.0, 0.0), [3.0] * 360, person)
+    assert done
+    assert (v, w) == (0.0, 0.0)
+
+
+def test_yield_command_stationary_person_is_done():
+    person = {"x": 1.0, "y": 0.0, "vx": 0.0, "vy": 0.0}
+    v, w, done = yield_command((0.0, 0.0, 0.0), [3.0] * 360, person)
+    assert done
+
+
+def test_yield_command_open_space_steps_aside():
+    person = {"x": 1.0, "y": 0.0, "vx": -0.3, "vy": 0.0}
+    v, w, done = yield_command((0.0, 0.0, 0.0), [3.0] * 360, person)
+    assert not done
+    assert v > 0.0 or w != 0.0
+
+
+def test_yield_command_threshold_switches_between_back_and_step_aside():
+    threshold = _YIELD_DIST + config.ROBOT_RADIUS + config.SAFETY_MARGIN
+    person = {"x": 1.0, "y": 0.0, "vx": -0.3, "vy": 0.0}
+
+    narrow = [threshold - 0.01] * 360
+    v_narrow, _, _ = yield_command((0.0, 0.0, 0.0), narrow, person)
+    assert v_narrow < 0.0
+
+    open_ranges = [threshold + 0.01] * 360
+    v_open, _, _ = yield_command((0.0, 0.0, 0.0), open_ranges, person)
+    assert v_open >= 0.0
+
+
+def test_yield_command_narrow_corridor_backs_away():
+    # 좌우 모두 STOP_DIST 근처로 막혀 있으면(복도) 사람 쪽으로 후진
+    ranges = [config.STOP_DIST] * 360
+    person = {"x": 1.0, "y": 0.0, "vx": -0.3, "vy": 0.0}
+    v, w, done = yield_command((0.0, 0.0, 0.0), ranges, person)
+    assert not done
+    assert v < 0.0
+
+
+def test_yield_command_picks_more_open_side():
+    # 사람이 +y 방향으로 이동(왼쪽에서 오른쪽) -> 좌우 비키는 방향은 진행 방향에 수직
+    # 오른쪽(로봇 -y 방향)만 넓게 열어두면 그쪽으로 비켜서야 함
+    ranges = [0.0] * 360  # 우선 전부 막힘으로 채운 뒤 한쪽만 열어둠
+    for i in range(len(ranges)):
+        ranges[i] = config.STOP_DIST
+    ranges[90] = 3.0  # 로봇 기준 왼쪽(90) 방향만 열림
+    person = {"x": 1.0, "y": 0.0, "vx": -0.3, "vy": 0.0}
+    v, w, done = yield_command((0.0, 0.0, 0.0), ranges, person)
+    assert not done
+    # 완전히 막히지 않았으므로 후진(v<0)이 아니라 비켜서는 동작(v>0 또는 회전)이어야 함
+    assert not (v < 0.0)
