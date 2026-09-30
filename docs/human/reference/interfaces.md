@@ -21,6 +21,14 @@ sar-robot 모듈의 구현 상태와 코드 위치를 정리한 문서입니다.
 | `sar/odometry.py` | `Odometry.pose()` | 없음 | `(x, y, theta)` |
 | `sar/odometry.py` | `Odometry.heading_var()` | 없음 | 방향 분산 P [rad²] |
 | `sar/odometry.py` | `Odometry.correct(dx, dy, dth)` | 보정값 [m, m, rad] | 없음 |
+| `sar/perception.py` | `TargetDetector(color, model_path)` | 대상 색(`HSV_RANGES` 키), YOLO 가중치 경로 또는 `None` | 검출기. YOLO는 생성 시 1회 로드 |
+| `sar/perception.py` | `TargetDetector.detect(bgr)` | BGR 이미지 또는 `None` | 가장 가까운 대상 검출 결과 `dict` 또는 `None` |
+| `sar/perception.py` | `TargetDetector.detect_all(bgr)` | BGR 이미지 또는 `None` | 대상 검출 결과 목록. 가까운 순서 |
+| `sar/perception.py` | `TargetDetector.to_world(det, pose)` | 검출 결과, `(x, y, theta)` | 대상 월드 좌표 `(x, y)` |
+| `sar/perception.py` | `Confirm.update(seen, xy, dist=None)` | 검출 여부, 대상 월드 좌표, 거리 [m] | `(확정 여부, 위치 추정 또는 None)` |
+| `sar/perception.py` | `is_excluded(xy, found)` | 대상 월드 좌표, 구조 완료 위치 목록 | `FOUND_EXCLUDE_RADIUS` 이내 여부 |
+| `sar/viz.py` | `render_map(grid, to_cell, trajectory, path, rescued, start, pose, title)` | 공개값 격자(-1/0/1), 월드→격자 변환 함수, 월드 좌표 목록 | BGR 지도 그림 |
+| `sar/viz.py` | `save_map(path, image)` | 저장 경로, 그림 | 저장 성공 여부 `bool` |
 
 LDS-01 라이다 인덱스는 180이 정면, 90이 왼쪽, 270이 오른쪽, 0이 뒤입니다. `compass()`는 원시 벡터를 반환합니다. 방향 [rad]으로 변환하고 부호·오프셋을 보정하는 작업은 미션의 INIT_SPIN 단계에서 수행합니다.
 
@@ -31,8 +39,44 @@ LDS-01 라이다 인덱스는 180이 정면, 90이 왼쪽, 270이 오른쪽, 0�
 | `sar/mission.py` | `Mission.tick()` | 통합 |
 | `sar/grid_map.py` | `GridMap.update()`, `to_cell()`, `to_world()`, `layers()`, `frontiers()` | 계획 |
 | `sar/planner.py` | `plan()`, `choose_frontier()` | 계획 |
-| `sar/perception.py` | `TargetDetector.detect()`, `to_world()`, `Confirm.update()` | 인지 |
-| `sar/viz.py` | 지도·경로·대상 위치 그림 저장 | 인지 |
 | `sar/local_control.py` | `pure_pursuit()`, `safety_filter()` | 행동 |
 
 구현하면 위 표에서 "구현된 인터페이스" 표로 옮기십시오. 함수 형식은 원본 문서 7.2절을 따르십시오.
+
+## 대상 검출 결과
+
+`detect()`와 `detect_all()`의 결과 항목은 다음 키를 가집니다.
+
+| 키 | 단위 | 내용 |
+|---|---|---|
+| `cx`, `cy` | px | 대상 중심 이미지 좌표 |
+| `w`, `h` | px | 상자 폭·높이. 색 분할 검출은 외접원 지름 |
+| `conf` | 0~1 | YOLO 신뢰도. 색 분할 검출은 원형도 |
+| `cls` | 정수 | COCO 클래스 번호. 색 분할 검출은 `None` |
+| `color` | 문자열 | 대상 색 |
+| `dist` | m | 카메라에서 대상까지 직선거리 |
+| `bearing` | rad | 정면 기준 방위각. 왼쪽이 양수 |
+| `source` | 문자열 | `"yolo"` 또는 `"color"` (YOLO 미검출로 색 분할 사용) |
+
+거리와 방위각 계산식은 다음과 같습니다. $W$는 이미지 폭, $\phi_h$는 수평 화각(`CAMERA_FOV`), $D$는 사과 지름(`TARGET_DIAMETER`), $w$는 상자 폭과 높이 중 큰 값입니다.
+
+$$
+f = \frac{W / 2}{\tan(\phi_h / 2)}, \qquad
+\beta = -\arctan\frac{c_x - W/2}{f}, \qquad
+d = \frac{f D}{w \cos\beta}
+$$
+
+원본 문서 6장의 $d \approx f D / w$는 광축 방향 깊이입니다. 화면 가장자리의 대상은 직선거리와 차이가 커서 $\cos\beta$로 나눕니다. 화면 끝에서 잘린 상자는 한 변만 줄어들므로 긴 변을 지름으로 사용합니다.
+
+## 검출 조건
+
+| 조건 | 설정값 | 내용 |
+|---|---|---|
+| YOLO 후보 | `YOLO_CLASSES`, `YOLO_CONF` | apple, orange, sports ball |
+| 색 판별 | `HSV_RANGES`, `COLOR_RATIO_MIN` | YOLO 상자 안 대상 색 픽셀 비율 하한 |
+| 색 분할 대체 | `USE_COLOR_FALLBACK`, `MIN_BLOB_AREA`, `MIN_CIRCULARITY` | YOLO 대상이 없을 때만 실행 |
+| 높이 제외 | `HORIZON_MARGIN` | 중심이 화면 가운데선보다 이 값 이상 위면 식탁 위 물체로 제외 |
+| 연속 확인 | `CONFIRM_FRAMES`, `CONFIRM_MATCH_RADIUS` | 연속 검출 위치가 반경을 벗어나면 기록 초기화 |
+| 위치 추정 | `CONFIRM_MIN_DIST` | 가중치 $1 / \max(d, d_{\min})^2$의 거리 가중 평균 |
+
+`detect()`는 호출할 때마다 YOLO를 실행합니다. 미션 루프에서 `YOLO_EVERY` step마다 호출하십시오. YOLO 로드에 실패하면 `load_error`에 사유를 기록하고 색 분할만 사용합니다.
