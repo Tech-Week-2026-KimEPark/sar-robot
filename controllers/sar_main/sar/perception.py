@@ -19,6 +19,7 @@ import numpy as np
 
 from sar import config
 
+Point = tuple[float, float]
 HsvRange = tuple[tuple[int, int, int], tuple[int, int, int]]
 
 
@@ -324,6 +325,129 @@ class Confirm:
         self._sum_y += weight * xy[1]
         self._count += 1
         return self._count >= self.frames, self.estimate()
+
+
+class PersonTracker:
+    """라이다 동적 점으로 움직이는 사람(다리)을 추적. docs 사람 회피 설계 3.1~3.2절.
+
+    update()는 grid.update() 호출 전에 실행해야 함. 갱신 후에는 사람이 찍힌 칸이 장애물로
+    바뀌어 동적 점이 사라짐.
+    """
+
+    def __init__(self) -> None:
+        self._tracks: list[dict] = []
+        self._next_id = 0
+        self._last_t: float | None = None
+
+    @staticmethod
+    def dynamic_points(pose: Sequence[float], ranges, grid) -> list[tuple[int, float, float]]:
+        """지도상 확인된 빈칸이면서 장애물에서 DYN_WALL_GAP 이상 떨어진 라이다 끝점.
+
+        반환: [(빔 인덱스, x, y), ...] 인덱스 오름차순.
+        """
+        if pose is None or not ranges:
+            return []
+        x, y, theta = pose
+        r = np.asarray(ranges, float)
+        n = len(r)
+        valid = np.isfinite(r) & (r >= config.LIDAR_MIN) & (r <= config.LIDAR_MAX)
+        ang = theta + math.pi - np.arange(n) * 2 * math.pi / n
+        rr = np.where(valid, r, 0.0)
+        px, py = x + rr * np.cos(ang), y + rr * np.sin(ang)
+        rows = np.floor((py - grid.y0) / grid.res).astype(int)
+        cols = np.floor((px - grid.x0) / grid.res).astype(int)
+        inside = valid & (rows >= 0) & (rows < grid.n) & (cols >= 0) & (cols < grid.n)
+        rows, cols = np.where(inside, rows, 0), np.where(inside, cols, 0)
+        known_free = grid.seen[rows, cols] & (grid.logodds[rows, cols] < 0)
+        far_wall = grid.clearance()[rows, cols] >= config.DYN_WALL_GAP
+        keep = np.flatnonzero(inside & known_free & far_wall)
+        return [(int(i), float(px[i]), float(py[i])) for i in keep]
+
+    @staticmethod
+    def candidates(points: list[tuple[int, float, float]], n_beams: int = 360) -> list[Point]:
+        """동적 점을 덩어리로 묶고 사람 폭 조건을 만족하는 덩어리 중심 목록. 다리 2개는 합침."""
+        clusters: list[list[tuple[float, float]]] = []
+        prev = None
+        for i, px, py in points:
+            adjacent = prev is not None and (i - prev[0]) % n_beams <= 1
+            if adjacent and math.dist(prev[1:], (px, py)) < config.DYN_CLUSTER_GAP:
+                clusters[-1].append((px, py))
+            else:
+                clusters.append([(px, py)])
+            prev = (i, px, py)
+        # 인덱스 0과 359가 이어지는 덩어리 병합
+        if len(clusters) > 1 and points and points[0][0] == 0 and points[-1][0] == n_beams - 1:
+            if math.dist(clusters[0][0], clusters[-1][-1]) < config.DYN_CLUSTER_GAP:
+                clusters[0] = clusters.pop() + clusters[0]
+        centers = []
+        for c in clusters:
+            width = math.dist(c[0], c[-1])
+            if config.PERSON_MIN_WIDTH <= width <= config.PERSON_MAX_WIDTH or len(c) == 1:
+                if width <= config.PERSON_MAX_WIDTH:
+                    centers.append((sum(p[0] for p in c) / len(c), sum(p[1] for p in c) / len(c)))
+        merged: list[list[Point]] = []
+        for p in centers:
+            for group in merged:
+                if math.dist(group[0], p) <= config.LEG_PAIR_DIST:
+                    group.append(p)
+                    break
+            else:
+                merged.append([p])
+        return [(sum(p[0] for p in g) / len(g), sum(p[1] for p in g) / len(g)) for g in merged]
+
+    def update(self, t: float, pose: Sequence[float], ranges, grid) -> list[dict]:
+        """추적 갱신 후 확정된 대상 목록 반환.
+
+        반환 항목: {"id", "x", "y", "vx", "vy", "age", "moving"}. 위치 [m], 속도 [m/s], age [s].
+        """
+        dt = 0.0 if self._last_t is None else max(t - self._last_t, 0.0)
+        self._last_t = t
+        n = len(ranges) if ranges else 360
+        found = self.candidates(self.dynamic_points(pose, ranges, grid), n)
+        for tr in self._tracks:  # 예측
+            tr["x"] += tr["vx"] * dt
+            tr["y"] += tr["vy"] * dt
+        pairs = sorted(
+            (math.dist((tr["x"], tr["y"]), c), ti, ci)
+            for ti, tr in enumerate(self._tracks)
+            for ci, c in enumerate(found)
+        )
+        used_t, used_c = set(), set()
+        for d, ti, ci in pairs:
+            if d > config.TRACK_GATE or ti in used_t or ci in used_c:
+                continue
+            used_t.add(ti)
+            used_c.add(ci)
+            tr = self._tracks[ti]
+            ex, ey = found[ci][0] - tr["x"], found[ci][1] - tr["y"]
+            tr["x"] += config.TRACK_ALPHA * ex
+            tr["y"] += config.TRACK_ALPHA * ey
+            if dt > 0:
+                tr["vx"] += config.TRACK_BETA / dt * ex
+                tr["vy"] += config.TRACK_BETA / dt * ey
+            tr["hits"] += 1
+            tr["seen"] = t
+        for ci, (cx, cy) in enumerate(found):
+            if ci not in used_c:
+                self._tracks.append(
+                    {"id": self._next_id, "x": cx, "y": cy, "vx": 0.0, "vy": 0.0,
+                     "hits": 1, "born": t, "seen": t}
+                )  # fmt: skip
+                self._next_id += 1
+        self._tracks = [tr for tr in self._tracks if t - tr["seen"] <= config.TRACK_TIMEOUT]
+        return [
+            {
+                "id": tr["id"],
+                "x": tr["x"],
+                "y": tr["y"],
+                "vx": tr["vx"],
+                "vy": tr["vy"],
+                "age": t - tr["born"],
+                "moving": math.hypot(tr["vx"], tr["vy"]) >= config.MOVING_SPEED,
+            }
+            for tr in self._tracks
+            if tr["hits"] >= config.TRACK_CONFIRM
+        ]
 
 
 if __name__ == "__main__":
