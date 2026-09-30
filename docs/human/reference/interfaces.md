@@ -29,6 +29,8 @@ sar-robot 모듈의 구현 상태와 코드 위치를 정리한 문서입니다.
 | `sar/perception.py` | `is_excluded(xy, found)` | 대상 월드 좌표, 구조 완료 위치 목록 | `FOUND_EXCLUDE_RADIUS` 이내 여부 |
 | `sar/viz.py` | `render_map(grid, to_cell, trajectory, path, rescued, start, pose, title)` | 공개값 격자(-1/0/1), 월드→격자 변환 함수, 월드 좌표 목록 | BGR 지도 그림 |
 | `sar/viz.py` | `save_map(path, image)` | 저장 경로, 그림 | 저장 성공 여부 `bool` |
+| `sar/local_control.py` | `pure_pursuit(pose, path, lookahead=config.LOOKAHEAD)` | pose `(x, y, theta)`, 경로 `[(x, y), ...]` | `(v, w, reached)`. 목표 각도 차이 55° 이상이면 제자리 회전 |
+| `sar/local_control.py` | `safety_filter(v, w, ranges)` | 속도 명령, 라이다 360개 | `(v, w, blocked)`. 정면 ±25° 콘 안 `config.STOP_DIST` 이내면 정지 |
 
 LDS-01 라이다 인덱스는 180이 정면, 90이 왼쪽, 270이 오른쪽, 0이 뒤입니다. `compass()`는 원시 벡터를 반환합니다. 방향 [rad]으로 변환하고 부호·오프셋을 보정하는 작업은 미션의 INIT_SPIN 단계에서 수행합니다.
 
@@ -39,7 +41,6 @@ LDS-01 라이다 인덱스는 180이 정면, 90이 왼쪽, 270이 오른쪽, 0�
 | `sar/mission.py` | `Mission.tick()` | 통합 |
 | `sar/grid_map.py` | `GridMap.update()`, `to_cell()`, `to_world()`, `layers()`, `frontiers()` | 계획 |
 | `sar/planner.py` | `plan()`, `choose_frontier()` | 계획 |
-| `sar/local_control.py` | `pure_pursuit()`, `safety_filter()` | 행동 |
 
 구현하면 위 표에서 "구현된 인터페이스" 표로 옮기십시오. 함수 형식은 원본 문서 7.2절을 따르십시오.
 
