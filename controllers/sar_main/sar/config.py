@@ -150,3 +150,14 @@ TUNER_LOST_TIMEOUT = 2.0  # s, 대상 미검출이 이 시간 이상이면 다�
 TUNER_EXPLORE_LOG_PERIOD = 2.0  # s, 자동 탐색 중 검출이 있을 때 측정 기록 최소 간격
 TUNER_MAP_VIEW_PERIOD = 1.0  # s, 지도 창 갱신 주기 (시뮬레이션 시간)
 TUNER_MAP_VIEW_MAX = 600  # px, 지도 창 긴 변 최대 크기
+
+# 움직이는 물체 추적 (docs 이동 장애물 회피 설계 3.1~3.2절). 사람·공 등 종류는 구분하지 않음
+DYN_WALL_GAP = 0.15  # m, 동적 점으로 인정하는 장애물 칸과의 최소 거리
+DYN_CLUSTER_GAP = 0.10  # m, 인접 빔 동적 점을 같은 덩어리로 묶는 거리
+DYN_MIN_WIDTH, DYN_MAX_WIDTH = 0.05, 1.0  # m, 움직이는 물체 후보 덩어리 폭
+DYN_MERGE_DIST = 0.40  # m, 가까운 덩어리(사람 다리 2개 등)를 한 물체로 합치는 중심 거리
+TRACK_GATE = 0.50  # m, 이전 추적 대상과 연결하는 최대 거리
+TRACK_ALPHA, TRACK_BETA = 0.5, 0.1  # 알파-베타 필터 계수
+TRACK_CONFIRM = 3  # 추적 확정에 필요한 연속 연결 횟수
+TRACK_TIMEOUT = 1.0  # s, 연결 없이 유지하는 시간
+MOVING_SPEED = 0.05  # m/s, 움직이는 대상으로 보는 속도 하한
