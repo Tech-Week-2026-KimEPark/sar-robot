@@ -91,13 +91,30 @@ defaults write com.cyberbotics.Webots-R2025a General.pythonCommand "$(pwd)/.venv
 
 ### 5. 원격 에셋 사전 캐시
 
-Webots R2025a는 월드의 텍스처·메시를 raw.githubusercontent.com에서 내려받습니다. macOS에서는 Webots에 포함된 Qt 6.5.3의 HTTP/2 처리 오류로 `error code: 399: Server is unable to maintain the header compression context` 경고가 발생하고 텍스처가 표시되지 않습니다. 월드를 열기 전에 에셋을 Webots 캐시에 저장하십시오.
+Webots R2025a는 월드의 PROTO·텍스처·메시를 raw.githubusercontent.com에서 내려받습니다. macOS에서는 Webots에 포함된 Qt 6.5.3의 네트워크 처리 오류로 다운로드가 실패합니다.
+
+| 콘솔 메시지 | 결과 |
+|---|---|
+| `Error downloading EXTERNPROTO ... error code: 2: Connection closed` | 해당 PROTO 노드 누락(`Skipped unknown ... node`) |
+| `Cannot download ... error code: 399: Server is unable to maintain the header compression context` | 텍스처·메시 미표시 |
+
+월드를 열기 전에 저장소 루트에서 다음 명령으로 Webots 캐시를 채우십시오.
 
 ```bash
 .venv/bin/python scripts/prefetch_webots_assets.py
 ```
 
-이 스크립트는 `worlds/webots_assets.txt`의 URL을 HTTP/1.1로 내려받습니다. 저장 위치는 Webots 캐시 폴더(macOS `~/Library/Caches/Cyberbotics/Webots/assets/`)이며 파일 이름은 URL의 SHA1 값입니다. 목록은 `sar_dev.wbt` 기준입니다. 다른 월드에서 같은 경고가 나오면 Webots 콘솔 내용을 파일로 저장해 인자로 전달하십시오.
+이 스크립트는 `worlds/*.wbt` 7개의 EXTERNPROTO를 재귀로 따라가며 PROTO와 에셋 URL을 수집합니다. 템플릿 변수로 이름을 만드는 텍스처는 GitHub 폴더 목록에서 이름 패턴이 맞는 파일을 모두 수집합니다. 수집한 파일은 HTTP/1.1로 내려받아 Webots 캐시 폴더(macOS `~/Library/Caches/Cyberbotics/Webots/assets/`)에 URL의 SHA1 이름으로 저장합니다. 2026-09-30 기준 619개, 약 140 MB입니다.
+
+- GitHub 폴더 목록 조회에는 `GITHUB_TOKEN` 환경변수 또는 `gh auth token`의 토큰을 사용합니다. 토큰이 없으면 시간당 60회 제한에 걸릴 수 있습니다.
+- 이미 캐시에 있는 파일과 폴더 목록은 다시 내려받지 않습니다.
+- 대회 당일 새 월드를 받으면 해당 `.wbt` 파일을 인자로 실행하십시오.
+
+```bash
+.venv/bin/python scripts/prefetch_webots_assets.py path/to/contest.wbt
+```
+
+그래도 경고가 남으면 Webots 콘솔 내용을 파일로 저장해 인자로 전달하십시오. 로그의 URL을 추출해 캐시에 저장합니다.
 
 ```bash
 .venv/bin/python scripts/prefetch_webots_assets.py webots_console.txt
@@ -113,13 +130,16 @@ Intro 실습 월드(`breakroom_teleop.wbt` 등)도 같은 방법으로 실행합
 ## 결과 확인
 
 - `pip check`: `No broken requirements found.`
-- 테스트: `12 passed` 이상 출력
-- 에셋 스크립트: `92 URLs, 0 failed` 출력
+- 테스트: `16 passed` 이상 출력. Intro 저장소가 형제 폴더에 있으면 Intro 실습 파일 동기화 검사 포함
+- 에셋 스크립트: `619 URLs, ... 0 failed` 출력
 - Webots 콘솔: 1초마다 `t=1.0s pose=(0.00, 0.00, 0.00) lidar_points=360 front=...m` 형식의 로그 출력. 로봇은 정지 상태
 
 | 증상 | 확인할 내용 |
 |---|---|
 | `Cannot download ... error code: 399` | `scripts/prefetch_webots_assets.py` 실행 후 Reload World |
+| `Error downloading EXTERNPROTO ... Connection closed` | `scripts/prefetch_webots_assets.py` 실행 후 Reload World |
+| `list failed ... rate limit exceeded` | `gh auth login` 또는 `GITHUB_TOKEN` 설정 후 재실행 |
+| `git status`에 `worlds/.*.wbproj` 변경 표시 | Webots 창 배치 자동 저장. `git checkout -- worlds/.*.wbproj`로 되돌린 뒤 커밋 |
 | `ModuleNotFoundError: No module named 'sar'` | Webots Python command가 `.venv/bin/python`인지, `pip install -e .` 실행 여부 |
 | `ModuleNotFoundError: No module named 'numpy'` | Webots Python command 설정 여부 |
 | `Unable to find the 'python' executable` | Python command 경로 오타 여부 |

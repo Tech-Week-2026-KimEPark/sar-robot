@@ -8,7 +8,7 @@ sar-robot의 폴더 구성, 모듈 사이 데이터 흐름, 구조를 선택한 
 sar-robot/
 ├── controllers/sar_mission/   팀 미션 컨트롤러
 ├── controllers/tb3_*/         Intro 실습 컨트롤러 8개 (원본 유지)
-├── scripts/                   Webots 에셋 캐시 스크립트
+├── scripts/                   Webots PROTO·에셋 사전 캐시 스크립트
 ├── src/sar/                   팀 코드 패키지
 │   ├── config.py              상수
 │   ├── geometry.py            좌표 규칙, Pose, 좌표 변환
@@ -17,7 +17,6 @@ sar-robot/
 ├── tests/                     pytest
 ├── worlds/*.wbt               Intro 실습 월드 7개
 ├── worlds/sar_dev.wbt         개발용 월드 (Intro breakroom_teleop_yolo 복사본)
-├── worlds/webots_assets.txt   개발용 월드의 원격 에셋 URL 목록
 ├── protos/                    목표 물체 사과 PROTO 4종
 └── models/YOLO/               YOLO 가중치 (Git 제외)
 ```
@@ -60,7 +59,17 @@ Webots의 `runtime.ini`는 사용하지 않습니다. `[python] COMMAND`는 상�
 
 ### 원격 에셋 사전 캐시
 
-실습 월드는 Webots 기본 PROTO와 텍스처를 GitHub에서 내려받습니다. Webots R2025a의 Qt 6.5.3은 이 다운로드에서 HTTP/2 헤더 압축 오류(`error code: 399`)가 발생합니다. 같은 파일을 curl의 HTTP/2 요청으로 받으면 정상 수신되므로 서버가 아니라 Qt 구현의 문제입니다. Webots는 캐시 폴더에 URL의 SHA1 이름으로 파일이 있으면 네트워크 요청을 하지 않습니다. `scripts/prefetch_webots_assets.py`는 이 규칙에 맞춰 에셋을 HTTP/1.1로 미리 저장합니다.
+실습 월드는 Webots 기본 PROTO와 텍스처를 GitHub에서 내려받습니다. Webots R2025a의 Qt 6.5.3은 이 다운로드에서 HTTP/2 헤더 압축 오류(`error code: 399`)와 연결 종료(`error code: 2`)가 발생합니다. 같은 파일을 curl의 HTTP/2 요청으로 받으면 정상 수신되므로 서버가 아니라 Qt 구현의 문제입니다. Webots는 캐시 폴더에 URL의 SHA1 이름으로 파일이 있으면 네트워크 요청을 하지 않습니다. `scripts/prefetch_webots_assets.py`는 이 규칙에 맞춰 파일을 HTTP/1.1로 미리 저장합니다.
+
+수집 대상은 월드 파일에서 시작해 재귀로 찾습니다.
+
+| 대상 | 수집 방법 |
+|---|---|
+| PROTO | `EXTERNPROTO` 선언. 상대 경로는 선언한 PROTO의 URL 기준으로 변환 |
+| 고정 이름 에셋 | 템플릿 밖의 `.jpg`, `.png`, `.hdr`, `.obj` 등 문자열 |
+| 템플릿 이름 에셋 | `%<= '"textures/pavement/' + textureName + '_pavement_base_color.jpg"' >%` 같은 식에서 폴더와 이름 패턴을 추출하고 GitHub API 폴더 목록에서 일치하는 파일 전체 |
+
+템플릿 변수 값은 월드마다 다르므로 폴더 안의 같은 패턴 파일을 모두 받습니다. 2026-09-30 기준 대상 폴더는 8개이며 폴더 전체 크기는 약 67 MB입니다.
 
 ### 모듈별 폴더
 
