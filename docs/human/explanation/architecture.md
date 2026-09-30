@@ -7,12 +7,15 @@ sar-robot의 폴더 구성, 모듈 사이 데이터 흐름, 구조를 선택한 
 ```text
 sar-robot/
 ├── controllers/sar_mission/   팀 미션 컨트롤러
+├── controllers/hsv_tuner/     HSV 임계값 튜닝 컨트롤러
 ├── controllers/tb3_*/         Intro 실습 컨트롤러 8개 (원본 유지)
 ├── scripts/                   Webots PROTO·에셋 사전 캐시 스크립트
 ├── src/sar/                   팀 코드 패키지
 │   ├── config.py              상수
 │   ├── geometry.py            좌표 규칙, Pose, 좌표 변환
 │   ├── robot_io.py            Webots 장치 접근
+│   ├── perception.py          대상 사과 검출, 거리·방위각, 연속 확인
+│   ├── viz.py                 지도·궤적·구조 위치 그림 저장
 │   └── localization/          Wheel Odometry
 ├── tests/                     pytest
 ├── worlds/*.wbt               Intro 실습 월드 7개
@@ -21,7 +24,7 @@ sar-robot/
 └── models/YOLO/               YOLO 가중치 (Git 제외)
 ```
 
-`mapping/`, `planning/`, `perception/`, `control/`, `mission/` 폴더는 기능을 구현할 때 추가합니다. 담당 역할은 [역할과 담당 범위](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/reference/team/roles.md)에 있습니다.
+`mapping/`, `planning/`, `control/`, `mission/` 폴더는 기능을 구현할 때 추가합니다. 담당 역할은 [역할과 담당 범위](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/reference/team/roles.md)에 있습니다.
 
 ## 데이터 흐름
 
@@ -41,7 +44,7 @@ flowchart LR
   CTL -->|v, w| IO
 ```
 
-현재 구현된 흐름은 `RobotIO → localization`과 로그 출력입니다. 컨트롤러는 바퀴 속도 0을 유지합니다.
+현재 미션 컨트롤러에 연결된 흐름은 `RobotIO → localization`과 로그 출력입니다. `perception`과 `viz`는 구현되었지만 미션 루프에 아직 연결되지 않았습니다. 컨트롤러는 바퀴 속도 0을 유지합니다.
 
 ## 구조 선택 이유
 
