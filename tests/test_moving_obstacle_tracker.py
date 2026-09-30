@@ -4,7 +4,7 @@ import pytest
 
 from sar import config
 from sar.grid_map import GridMap
-from sar.perception import PersonTracker
+from sar.perception import MovingObstacleTracker
 
 DT = 0.064
 LEG_R = 0.06  # m, 다리 반지름
@@ -42,7 +42,7 @@ def scan_legs(robot, person):
 
 
 def test_tracks_walking_person_velocity():
-    grid, tracker = known_free_grid(), PersonTracker()
+    grid, tracker = known_free_grid(), MovingObstacleTracker()
     robot = (0.0, 0.0, 0.0)
     people = []
     for k in range(int(3.0 / DT)):
@@ -56,13 +56,19 @@ def test_tracks_walking_person_velocity():
     assert p["moving"] is True
 
 
-def test_wall_points_are_not_dynamic():
-    grid, tracker = known_free_grid(), PersonTracker()
+def test_static_objects_are_not_reported():
+    grid, tracker = known_free_grid(), MovingObstacleTracker()
     r, c = grid.to_cell(2.0, 0.0)
-    grid.logodds[r - 20 : r + 21, c] = config.L_MAX  # x = 2 m 벽
+    grid.logodds[r - 20 : r + 21, c] = config.L_MAX  # x = 2 m 벽 (지도에 있는 장애물)
     grid.invalidate()
-    ranges = [math.inf] * 360
-    ranges[180] = 2.0  # 정면 벽 반사
+    robot = (0.0, 0.0, 0.0)
+    wall = [math.inf] * 360
+    wall[180] = 2.0  # 정면 벽 반사
+    assert MovingObstacleTracker.dynamic_points(robot, wall, grid) == []
+    # 지도에 없는 정지 물체: 추적은 확정되지만 움직이지 않으므로 기본 반환에서 제외
+    box = scan_legs(robot, (1.0, 1.5))
     for k in range(10):
-        assert tracker.update(k * DT, (0.0, 0.0, 0.0), ranges, grid) == []
-    assert PersonTracker.dynamic_points((0.0, 0.0, 0.0), ranges, grid) == []
+        moving = tracker.update(k * DT, robot, box, grid)
+    assert moving == []
+    still = tracker.update(10 * DT, robot, box, grid, moving_only=False)
+    assert len(still) == 1 and still[0]["moving"] is False

@@ -327,10 +327,12 @@ class Confirm:
         return self._count >= self.frames, self.estimate()
 
 
-class PersonTracker:
-    """라이다 동적 점으로 움직이는 사람(다리)을 추적. docs 사람 회피 설계 3.1~3.2절.
+class MovingObstacleTracker:
+    """라이다 동적 점으로 움직이는 물체를 추적. docs 이동 장애물 회피 설계 3.1~3.2절.
 
-    update()는 grid.update() 호출 전에 실행해야 함. 갱신 후에는 사람이 찍힌 칸이 장애물로
+    라이다는 물체 종류를 구분하지 못하므로 사람, 공 등을 구분하지 않고 움직이는 덩어리를 추적함.
+
+    update()는 grid.update() 호출 전에 실행해야 함. 갱신 후에는 물체가 찍힌 칸이 장애물로
     바뀌어 동적 점이 사라짐.
     """
 
@@ -365,7 +367,7 @@ class PersonTracker:
 
     @staticmethod
     def candidates(points: list[tuple[int, float, float]], n_beams: int = 360) -> list[Point]:
-        """동적 점을 덩어리로 묶고 사람 폭 조건을 만족하는 덩어리 중심 목록. 다리 2개는 합침."""
+        """동적 점을 덩어리로 묶고 폭 조건을 만족하는 덩어리 중심 목록. 가까운 덩어리는 합침."""
         clusters: list[list[tuple[float, float]]] = []
         prev = None
         for i, px, py in points:
@@ -382,21 +384,23 @@ class PersonTracker:
         centers = []
         for c in clusters:
             width = math.dist(c[0], c[-1])
-            if config.PERSON_MIN_WIDTH <= width <= config.PERSON_MAX_WIDTH or len(c) == 1:
-                if width <= config.PERSON_MAX_WIDTH:
+            if config.DYN_MIN_WIDTH <= width <= config.DYN_MAX_WIDTH or len(c) == 1:
+                if width <= config.DYN_MAX_WIDTH:
                     centers.append((sum(p[0] for p in c) / len(c), sum(p[1] for p in c) / len(c)))
         merged: list[list[Point]] = []
         for p in centers:
             for group in merged:
-                if math.dist(group[0], p) <= config.LEG_PAIR_DIST:
+                if math.dist(group[0], p) <= config.DYN_MERGE_DIST:
                     group.append(p)
                     break
             else:
                 merged.append([p])
         return [(sum(p[0] for p in g) / len(g), sum(p[1] for p in g) / len(g)) for g in merged]
 
-    def update(self, t: float, pose: Sequence[float], ranges, grid) -> list[dict]:
-        """추적 갱신 후 확정된 대상 목록 반환.
+    def update(
+        self, t: float, pose: Sequence[float], ranges, grid, moving_only: bool = True
+    ) -> list[dict]:
+        """추적 갱신 후 확정된 대상 목록 반환. moving_only면 속도 MOVING_SPEED 이상만 반환.
 
         반환 항목: {"id", "x", "y", "vx", "vy", "age", "moving"}. 위치 [m], 속도 [m/s], age [s].
         """
@@ -447,8 +451,12 @@ class PersonTracker:
             }
             for tr in self._tracks
             if tr["hits"] >= config.TRACK_CONFIRM
+            and (not moving_only or math.hypot(tr["vx"], tr["vy"]) >= config.MOVING_SPEED)
         ]
 
+
+# 이전 이름. local_control.predict_conflict·yield_command 설명이 참조함
+PersonTracker = MovingObstacleTracker
 
 if __name__ == "__main__":
     # Webots 없이 실행하는 단독 확인: 합성 이미지의 빨간 원 검출
