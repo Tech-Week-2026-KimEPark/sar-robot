@@ -27,12 +27,12 @@ cd sar-robot
 python3.10 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -r requirements-dev.txt -r requirements-yolo.txt
-.venv/bin/python -m pip install -e .
 ```
 
 - 가상환경 경로는 저장소 루트의 `.venv`로 만드십시오.
 - `requirements-yolo.txt`는 torch를 포함하며 macOS 기준 약 1 GB입니다. Linux·Windows는 [PyTorch 설치 방법](../reference/intro-environment.md#pytorch-설치-방법)의 장치별 명령을 먼저 실행하십시오.
-- `pip install -e .`는 `src/sar` 패키지를 가상환경에 등록합니다. 컨트롤러는 이 등록으로 `from sar import ...`를 실행합니다.
+- 팀 코드는 `controllers/sar_main/sar/`에 있으며 설치하지 않습니다. Webots가 컨트롤러 폴더를 import 경로에 포함합니다.
+- 이전 구조에서 `pip install -e .`를 실행했다면 `.venv/bin/python -m pip uninstall -y sar-robot`로 제거하십시오.
 
 YOLO 모델 `models/YOLO/yolo11n.pt`는 Git에 포함하지 않습니다. 다음 명령으로 내려받으십시오.
 
@@ -87,7 +87,7 @@ macOS에서는 터미널에서 설정할 수도 있습니다. Webots를 종료�
 defaults write com.cyberbotics.Webots-R2025a General.pythonCommand "$(pwd)/.venv/bin/python"
 ```
 
-이 설정은 Intro 실습 컨트롤러(`tb3_*`)와 `sar_mission`에 모두 적용됩니다.
+이 설정은 Intro 실습 컨트롤러(`tb3_*`)와 `sar_main`에 모두 적용됩니다.
 
 ### 5. 원격 에셋 사전 캐시
 
@@ -123,16 +123,17 @@ Webots R2025a는 월드의 PROTO·텍스처·메시를 raw.githubusercontent.com
 ### 6. 시뮬레이션 실행
 
 1. Webots에서 File > Open World로 `worlds/sar_dev.wbt`를 여십시오. 이미 열려 있으면 File > Reload World를 선택하십시오.
-2. 시뮬레이션을 시작하십시오. 로봇 컨트롤러는 `sar_mission`입니다.
+2. 시뮬레이션을 시작하십시오. 로봇 컨트롤러는 `sar_main`입니다.
 
 Intro 실습 월드(`breakroom_teleop.wbt` 등)도 같은 방법으로 실행합니다.
 
 ## 결과 확인
 
 - `pip check`: `No broken requirements found.`
-- 테스트: `16 passed` 이상 출력. Intro 저장소가 형제 폴더에 있으면 Intro 실습 파일 동기화 검사 포함
+- 테스트: `17 passed` 이상 출력. Intro 저장소가 형제 폴더에 있으면 Intro 실습 파일 동기화 검사 포함
 - 에셋 스크립트: `619 URLs, ... 0 failed` 출력
-- Webots 콘솔: 1초마다 `t=1.0s pose=(0.00, 0.00, 0.00) lidar_points=360 front=...m` 형식의 로그 출력. 로봇은 정지 상태
+- 모듈 단독 테스트: `controllers/sar_main`에서 `../../.venv/bin/python -m sar.odometry` 실행 시 `odometry self-test ok` 출력
+- Webots 콘솔: 1초마다 `[t=1.1s] pose=(-0.30, -7.50, 3.14) lidar_points=360 front=...m` 형식의 로그 출력. pose 시작값은 `config.py`의 `START_X`, `START_Y`, `START_THETA`. 로봇은 정지 상태
 
 | 증상 | 확인할 내용 |
 |---|---|
@@ -140,7 +141,7 @@ Intro 실습 월드(`breakroom_teleop.wbt` 등)도 같은 방법으로 실행합
 | `Error downloading EXTERNPROTO ... Connection closed` | `scripts/prefetch_webots_assets.py` 실행 후 Reload World |
 | `list failed ... rate limit exceeded` | `gh auth login` 또는 `GITHUB_TOKEN` 설정 후 재실행 |
 | `git status`에 `worlds/.*.wbproj` 변경 표시 | Webots 창 배치 자동 저장. `git checkout -- worlds/.*.wbproj`로 되돌린 뒤 커밋 |
-| `ModuleNotFoundError: No module named 'sar'` | Webots Python command가 `.venv/bin/python`인지, `pip install -e .` 실행 여부 |
+| `ModuleNotFoundError: No module named 'sar'` | 월드 로봇의 `controller` 필드가 `sar_main`인지, `controllers/sar_main/sar/` 폴더 존재 여부 |
 | `ModuleNotFoundError: No module named 'numpy'` | Webots Python command 설정 여부 |
 | `Unable to find the 'python' executable` | Python command 경로 오타 여부 |
 | `lidar_points=0` | 월드의 로봇 `extensionSlot`에 `RobotisLds01` 존재 여부 |
