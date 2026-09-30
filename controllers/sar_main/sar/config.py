@@ -44,6 +44,19 @@ OCC_THRESHOLD = 0.3  # 이보다 크면 장애물 (확률 약 0.57)
 LIDAR_MIN, LIDAR_MAX = 0.12, 3.5  # m
 INFLATE = ROBOT_RADIUS + 0.07  # m
 MIN_FRONTIER_CELLS = 6
+MAP_SIZE = 32.0  # m, 시작점 중심 정사각형 지도 한 변 (640 x 640칸)
+RAY_STEP = MAP_RES / 2  # m, 라이다 광선 추적 표본 간격
+WALL_BAND = 0.20  # m, 팽창 영역 바깥에서 벽 근처 추가 비용을 주는 폭
+
+# 경로 계획
+WALL_COST = 2.0  # 벽 근처 칸 비용 배수의 최대 증가량 (팽창 경계에서 1 + WALL_COST)
+UNKNOWN_COST = 1.5  # allow_unknown일 때 모르는 칸 비용 배수
+PLAN_MARGIN = 1.0  # m, 계획 영역 = 확인한 영역 + 시작·목표를 포함하는 여백
+SNAP_RADIUS = 0.5  # m, 시작·목표가 통과 불가 칸이면 이 반경 안의 가장 가까운 통과 가능 칸 사용
+PATH_SMOOTH = True  # 시야선 기반 경로 다듬기. False면 격자 경로를 그대로 사용
+PATH_STEP = 0.10  # m, 반환 경로의 점 간격
+BLACKLIST_RADIUS = 0.5  # m, 블랙리스트 좌표 주변 프론티어 제외 반경
+FRONTIER_MIN_DIST = 0.3  # m, 이보다 가까운 프론티어 칸은 목표에서 제외 (제자리 목표 방지)
 
 # 위치 추정
 HEADING_Q = 0.01**2  # 방향 예측 잡음 (한 스텝, rad^2)

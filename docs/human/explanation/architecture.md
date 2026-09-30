@@ -13,6 +13,9 @@ sar-robot/
 │       ├── robot_io.py        Webots 장치 접근
 │       ├── odometry.py        엔코더 오도메트리, 방향 칼만 필터
 │       ├── perception.py      대상 사과 검출, 거리·방위각, 연속 확인
+│       ├── grid_map.py        점유 격자, 장애물 팽창, 프론티어
+│       ├── planner.py         A* 경로, 다익스트라 프론티어 선택·복귀 거리 지도
+│       ├── local_control.py   pure pursuit 경로 추종, 라이다 안전 필터
 │       └── viz.py             지도·궤적·구조 위치 그림 저장
 ├── controllers/hsv_tuner/     HSV 임계값 튜닝 컨트롤러 (sar_main/sar 사용)
 ├── controllers/tb3_*/         Intro 실습 컨트롤러 8개 (원본 유지)
@@ -24,7 +27,7 @@ sar-robot/
 └── models/YOLO/               YOLO 가중치 (Git 제외)
 ```
 
-`mission.py`, `grid_map.py`, `planner.py`, `local_control.py`는 기능을 구현할 때 `sar/`에 추가합니다. 파일 구조의 원본은 docs [과제와 구현 기준](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/reference/sar-과제-구현-기준.md) 7장(`CONTEXT.md` 기준)입니다. 담당 역할은 [역할과 담당 범위](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/reference/team/roles.md)에 있습니다.
+`mission.py`는 기능을 구현할 때 `sar/`에 추가합니다. 파일 구조의 원본은 docs [과제와 구현 기준](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/reference/sar-과제-구현-기준.md) 7장(`CONTEXT.md` 기준)입니다. 담당 역할은 [역할과 담당 범위](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/reference/team/roles.md)에 있습니다.
 
 ## 데이터 흐름
 
@@ -44,7 +47,7 @@ flowchart LR
   CTL -->|v, w| IO
 ```
 
-현재 미션 컨트롤러에 연결된 흐름은 `robot_io → odometry`와 로그 출력입니다. `perception`과 `viz`는 구현되었지만 미션 루프에 아직 연결되지 않았습니다. 컨트롤러는 바퀴 속도 0을 유지합니다.
+현재 미션 컨트롤러에 연결된 흐름은 `robot_io → odometry`와 로그 출력입니다. `perception`, `viz`, `grid_map`, `planner`, `local_control`은 구현되었지만 미션 루프에 아직 연결되지 않았습니다. 컨트롤러는 바퀴 속도 0을 유지합니다.
 
 ## 구조 선택 이유
 
