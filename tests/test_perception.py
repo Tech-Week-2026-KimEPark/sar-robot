@@ -141,6 +141,7 @@ class _FakeYolo:
         self.boxes = boxes  # [(x1, y1, x2, y2, conf, cls), ...]
 
     def predict(self, image, **kwargs):
+        self.kwargs = kwargs
         rows = self.boxes or np.zeros((0, 6))
         arr = np.asarray(rows, float).reshape(-1, 6)
         boxes = types.SimpleNamespace(
@@ -260,3 +261,27 @@ def test_last_yolo_keeps_rejected_boxes_with_ratio():
     assert detector.last_yolo_ms is not None
     detector.detect_all(None)
     assert detector.last_yolo == []
+
+
+def test_yolo_target_not_duplicated_by_color():
+    image = draw_ball(blank(), 400, 300, 15, RED)
+    detections = detector_with_yolo([(385, 285, 415, 315, 0.8, 47)]).detect_all(image)
+    assert [d["source"] for d in detections] == ["yolo"]
+
+
+def test_color_adds_second_apple_missed_by_yolo():
+    # 병합 분석 6.1절 8번: YOLO가 한 사과만 찾으면 두 번째 사과가 누락되던 문제
+    image = blank()
+    draw_ball(image, 450, 320, 20, RED)  # 가까운 사과, YOLO 검출
+    draw_ball(image, 150, 300, 8, RED)  # 먼 사과, YOLO 미검출
+    detections = detector_with_yolo([(430, 300, 470, 340, 0.7, 47)]).detect_all(image)
+    assert [d["source"] for d in detections] == ["yolo", "color"]
+    assert detections[1]["cx"] == pytest.approx(150, abs=1)
+
+
+def test_yolo_uses_class_agnostic_nms():
+    # 실제 프레임에서 한 사과가 apple·sports ball 두 상자로 검출되던 문제
+    detector = detector_with_yolo([(385, 285, 415, 315, 0.8, 47)])
+    detector.detect_all(draw_ball(blank(), 400, 300, 15, RED))
+    assert detector.model.kwargs["agnostic_nms"] is True
+    assert detector.model.kwargs["verbose"] is False

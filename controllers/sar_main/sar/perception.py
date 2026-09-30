@@ -3,7 +3,8 @@
 검출 순서 (과제와 구현 기준 9장)
 1. YOLO11n으로 apple·orange·sports ball 후보 상자 검출
 2. 상자 안 대상 색 픽셀 비율이 COLOR_RATIO_MIN 이상인 후보만 대상으로 판정
-3. YOLO 대상이 없으면 같은 프레임에서 색 분할(면적·원형도 조건)로 대체 검출
+3. 같은 프레임의 색 분할(면적·원형도 조건) 덩어리 중 YOLO 대상 상자 밖에 있는 것을 추가.
+   YOLO가 놓친 먼 사과나 한 화면의 두 번째 사과를 보완
 4. 중심이 화면 가운데선보다 HORIZON_MARGIN 이상 위인 후보는 식탁 위 물체로 제외
 
 거리는 사과 지름과 상자 크기로 추정하고, 위치는 Confirm의 거리 가중 평균으로 확정한다.
@@ -89,6 +90,13 @@ def find_color_blobs(mask: np.ndarray) -> list[dict]:
     return blobs
 
 
+def _center_inside(item: dict, box: dict) -> bool:
+    """item 중심이 box 상자(cx, cy, w, h) 안에 있으면 True."""
+    return (
+        abs(item["cx"] - box["cx"]) <= box["w"] / 2 and abs(item["cy"] - box["cy"]) <= box["h"] / 2
+    )
+
+
 def to_world(det: dict, pose: Sequence[float]) -> tuple[float, float]:
     """검출 결과의 거리·방위각과 로봇 pose (x, y, theta)로 대상 월드 좌표 (x, y) 계산."""
     x, y, theta = pose
@@ -147,7 +155,11 @@ class TargetDetector:
         start = time.perf_counter()
         try:
             result = self.model.predict(
-                bgr, conf=config.YOLO_CONF, classes=config.YOLO_CLASSES, verbose=False
+                bgr,
+                conf=config.YOLO_CONF,
+                classes=config.YOLO_CLASSES,
+                agnostic_nms=True,  # 클래스 무관 NMS. 한 사과의 apple·sports ball 중복 방지
+                verbose=False,
             )[0]
         except Exception as exc:  # noqa: BLE001 - 추론 실패 프레임은 색 분할로 대체
             self.last_error = f"{type(exc).__name__}: {exc}"
@@ -188,10 +200,12 @@ class TargetDetector:
                     "source": "yolo",
                 }
             )
-        if not candidates and config.USE_COLOR_FALLBACK:
-            candidates = [
-                {**blob, "cls": None, "source": "color"} for blob in find_color_blobs(mask)
-            ]
+        if config.USE_COLOR_FALLBACK:
+            yolo_targets = list(candidates)
+            for blob in find_color_blobs(mask):
+                if any(_center_inside(blob, box) for box in yolo_targets):
+                    continue  # YOLO가 이미 찾은 대상
+                candidates.append({**blob, "cls": None, "source": "color"})
 
         detections = []
         for det in candidates:
