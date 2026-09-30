@@ -67,3 +67,32 @@ def test_correct():
     odom = Odometry(1.0, 2.0, 0.0)
     odom.correct(0.1, -0.2, 0.05)
     assert odom.pose() == pytest.approx((1.1, 1.8, 0.05))
+
+
+def test_wheel_separation_scale_default_is_unchanged():
+    d = math.pi / 2 * L / 2
+    default_theta = drive(Odometry(0.0, 0.0, 0.0), -d, d)[2]
+
+    scaled = Odometry(0.0, 0.0, 0.0)
+    scaled.set_wheel_separation_scale(1.0)
+    scaled.update(0.0, 0.0)
+    scaled.update(-d / R, d / R)
+    assert scaled.pose()[2] == pytest.approx(default_theta)
+
+
+def test_wheel_separation_scale_above_one_reduces_measured_rotation():
+    # mission.fit_compass()가 측정한 "오도메트리/나침반 회전 비율"(예: 1.104)을
+    # 그대로 전달하면, 같은 바퀴 회전각 차이에서도 dth가 그만큼 줄어들어야 함
+    d = math.pi / 2 * L / 2  # 보정 없이 90도에 해당하는 바퀴 이동거리
+    scale = 1.104
+
+    plain = Odometry(0.0, 0.0, 0.0)
+    plain.update(0.0, 0.0)
+    plain.update(-d / R, d / R)
+
+    scaled = Odometry(0.0, 0.0, 0.0)
+    scaled.set_wheel_separation_scale(scale)
+    scaled.update(0.0, 0.0)
+    scaled.update(-d / R, d / R)
+
+    assert scaled.pose()[2] == pytest.approx(plain.pose()[2] / scale)

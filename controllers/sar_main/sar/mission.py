@@ -167,6 +167,7 @@ class Mission:
                 self.log(f"[t={self.t:.1f}s] 나침반 보정 실패, 엔코더 방향만 사용")
             else:
                 sign, offset, scale = self.compass_fit
+                self.odom.set_wheel_separation_scale(scale)
                 self.log(
                     f"[t={self.t:.1f}s] 나침반 보정 sign={sign} offset={offset:.3f} "
                     f"오도메트리/나침반 회전 비율={scale:.3f}"
