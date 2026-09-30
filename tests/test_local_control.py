@@ -3,7 +3,7 @@ import math
 import pytest
 
 from sar import config
-from sar.local_control import _FRONT_HALF_ANGLE, pure_pursuit, safety_filter
+from sar.local_control import _FRONT_HALF_ANGLE, _SLOW_DIST, pure_pursuit, safety_filter
 
 
 def test_pure_pursuit_no_path_is_reached():
@@ -102,3 +102,44 @@ def test_safety_filter_cone_covers_robot_width_at_stop_dist():
     # 덮어야 함 (sar-robot-병합-분석.md 6.3절). 반각 25도(반폭 0.093m)는 부족했음.
     half_width = config.STOP_DIST * math.tan(_FRONT_HALF_ANGLE)
     assert half_width >= config.ROBOT_RADIUS + config.SAFETY_MARGIN - 1e-9
+
+
+def test_safety_filter_slows_down_before_stop_dist():
+    # 대피 인원 이동 대응(과제와 구현 기준 12장): 정지 거리 도달 전부터 서서히 감속
+    ranges = [3.0] * 360
+    mid = (config.STOP_DIST + _SLOW_DIST) / 2
+    ranges[180] = mid
+    v, w, blocked = safety_filter(config.V_MAX, 0.0, ranges)
+    assert not blocked
+    assert 0.0 < v < config.V_MAX
+
+
+def test_safety_filter_no_slowdown_beyond_slow_dist():
+    ranges = [3.0] * 360
+    ranges[180] = _SLOW_DIST + 0.01
+    assert safety_filter(config.V_MAX, 0.0, ranges) == (config.V_MAX, 0.0, False)
+
+
+def test_safety_filter_full_stop_scales_to_zero():
+    ranges = [3.0] * 360
+    ranges[180] = config.STOP_DIST + 1e-6
+    v, w, blocked = safety_filter(config.V_MAX, 0.0, ranges)
+    assert not blocked
+    assert v == pytest.approx(0.0, abs=1e-3)
+
+
+def test_safety_filter_yields_toward_open_side():
+    # 오른쪽(270 방향)만 막혀 있으면 왼쪽으로 살짝 틀어 통로를 양보함(w 증가).
+    # 180은 좌우 콘의 경계라 왼쪽에도 포함되므로 건드리지 않음
+    ranges = [3.0] * 360
+    ranges[200] = (config.STOP_DIST + _SLOW_DIST) / 2  # 오른쪽 방향만 좁음
+    v, w, blocked = safety_filter(config.V_MAX, 0.0, ranges)
+    assert not blocked
+    assert w > 0.0
+
+
+def test_safety_filter_yield_clips_to_w_max():
+    ranges = [3.0] * 360
+    ranges[200] = config.STOP_DIST + 0.01  # 오른쪽만 좁아서 양보 편향이 생김
+    v, w, blocked = safety_filter(config.V_MAX, config.W_MAX, ranges)
+    assert abs(w) <= config.W_MAX + 1e-9

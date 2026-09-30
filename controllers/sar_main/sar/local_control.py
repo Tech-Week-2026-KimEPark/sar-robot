@@ -15,6 +15,12 @@ _PIVOT_ANGLE = math.radians(55)  # 이보다 많이 틀어지면 제자리 회�
 # 좁아 모서리 방향 장애물을 놓칠 수 있었음 (sar-robot-병합-분석.md 6.3절).
 _FRONT_HALF_ANGLE = math.atan((config.ROBOT_RADIUS + config.SAFETY_MARGIN) / config.STOP_DIST)
 
+# 창의성 제안(과제와 구현 기준 12장 "대피 인원 이동"): 정지 거리 안에 닿기 전부터
+# 서서히 감속하고, 여유 있는 쪽으로 살짝 방향을 틀어 통로를 양보한다. 라이다는
+# 장애물이 사람인지 구분하지 못하므로 이동하는 모든 근접 장애물에 동일하게 반응한다.
+_SLOW_DIST = config.STOP_DIST + 0.30  # m, 이 거리부터 감속 시작
+_YIELD_GAIN = 1.0  # rad/s per m, 좌우 여유 차이에 비례한 양보 회전
+
 
 def _to_robot_frame(target: tuple[float, float], pose: tuple[float, float, float]) -> tuple:
     """월드 좌표 점을 로봇 기준 좌표로 변환. x는 전방, y는 좌측."""
@@ -79,6 +85,9 @@ def pure_pursuit(
 def safety_filter(v: float, w: float, ranges: list[float] | None) -> tuple[float, float, bool]:
     """진행 방향(전진 시 정면, 후진 시 후면)에 장애물이 정지 거리 안에 있으면 막음.
 
+    `STOP_DIST`와 `_SLOW_DIST` 사이에서는 거리에 비례해 감속하고, 좌우 중 여유
+    있는 쪽으로 살짝 방향을 틀어 통로를 양보한다 (대피 인원 등 이동 장애물 대응).
+
     반환: (v, w, blocked). `ranges`가 없으면(센서 미가동) 그대로 통과시킴. `v == 0`이면
     검사하지 않음. 라이다 인덱스 규칙(0=뒤, 90=왼쪽, 180=정면, 270=오른쪽)은
     CONTEXT.md 5.4절. 후진 미검사 문제는 sar-robot-병합-분석.md 6.1절 4번.
@@ -89,10 +98,20 @@ def safety_filter(v: float, w: float, ranges: list[float] | None) -> tuple[float
     n = len(ranges)
     center = n // 2 if v > 0.0 else 0
     half_span = round(n * _FRONT_HALF_ANGLE / (2 * math.pi))
-    nearest = min(ranges[i % n] for i in range(center - half_span, center + half_span + 1))
+    left = range(center - half_span, center + 1)  # 낮은 인덱스 = 왼쪽(90 방향)
+    right = range(center, center + half_span + 1)  # 높은 인덱스 = 오른쪽(270 방향)
+    left_min = min(ranges[i % n] for i in left)
+    right_min = min(ranges[i % n] for i in right)
+    nearest = min(left_min, right_min)
 
     if nearest < config.STOP_DIST:
         return 0.0, w, True
+
+    if nearest < _SLOW_DIST:
+        scale = (nearest - config.STOP_DIST) / (_SLOW_DIST - config.STOP_DIST)
+        yield_w = _YIELD_GAIN * (left_min - right_min)  # 오른쪽이 좁으면 음수(우회전)
+        return v * scale, max(-config.W_MAX, min(config.W_MAX, w + yield_w)), False
+
     return v, w, False
 
 
@@ -111,4 +130,10 @@ if __name__ == "__main__":
     ranges[180] = 0.1
     v, w, blocked = safety_filter(config.V_MAX, 0.0, ranges)
     assert v == 0.0 and blocked
+
+    # 대피 인원 이동: 정지 거리 도달 전 감속, 막힌 쪽 반대로 양보
+    ranges = [3.0] * 360
+    ranges[200] = (config.STOP_DIST + _SLOW_DIST) / 2  # 오른쪽만 좁음
+    v, w, blocked = safety_filter(config.V_MAX, 0.0, ranges)
+    assert not blocked and 0.0 < v < config.V_MAX and w > 0.0
     print("local_control self-test ok")
