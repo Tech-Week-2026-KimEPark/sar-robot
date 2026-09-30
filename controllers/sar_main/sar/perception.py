@@ -3,7 +3,8 @@
 검출 순서 (과제와 구현 기준 9장)
 1. YOLO11n으로 apple·orange·sports ball 후보 상자 검출
 2. 상자 안 대상 색 픽셀 비율이 COLOR_RATIO_MIN 이상인 후보만 대상으로 판정
-3. YOLO 대상이 없으면 같은 프레임에서 색 분할(면적·원형도 조건)로 대체 검출
+3. 같은 프레임의 색 분할(면적·원형도 조건) 덩어리 중 YOLO 대상 상자 밖에 있는 것을 추가.
+   YOLO가 놓친 먼 사과나 한 화면의 두 번째 사과를 보완
 4. 중심이 화면 가운데선보다 HORIZON_MARGIN 이상 위인 후보는 식탁 위 물체로 제외
 
 거리는 사과 지름과 상자 크기로 추정하고, 위치는 Confirm의 거리 가중 평균으로 확정한다.
@@ -67,26 +68,64 @@ def box_color_ratio(mask: np.ndarray, x1: float, y1: float, x2: float, y2: float
     return float(np.count_nonzero(mask[r1:r2, c1:c2])) / ((r2 - r1) * (c2 - c1))
 
 
-def find_color_blobs(mask: np.ndarray) -> list[dict]:
-    """마스크에서 면적·원형도 조건을 만족하는 원형 덩어리 목록 반환.
+def _blob_body(contour: np.ndarray) -> np.ndarray | None:
+    """덩어리에서 꼭지 같은 가는 돌출부를 지운 본체 윤곽. 본체가 사라지면 None.
 
-    반환 항목: {"cx", "cy", "w", "h", "conf"}. w·h는 외접원 지름, conf는 원형도.
+    열림 연산 커널은 덩어리 짧은 변의 BLOB_OPEN_RATIO배. 3 px 미만이면 원래 윤곽 사용.
     """
+    x, y, w, h = cv2.boundingRect(contour)
+    size = round(min(w, h) * config.BLOB_OPEN_RATIO)
+    if size < config.MASK_KERNEL_SIZE:
+        return contour
+    blob = np.zeros((h + 2, w + 2), np.uint8)
+    cv2.drawContours(blob, [contour - (x - 1, y - 1)], -1, 255, -1)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size | 1, size | 1))
+    body = cv2.morphologyEx(blob, cv2.MORPH_OPEN, kernel)
+    parts, _ = cv2.findContours(body, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not parts:
+        return None
+    return max(parts, key=cv2.contourArea) + (x - 1, y - 1)
+
+
+def find_color_blobs(mask: np.ndarray) -> list[dict]:
+    """마스크에서 사과 모양 덩어리 목록 반환.
+
+    조건: 면적 MIN_BLOB_AREA 이상, 화면 가장자리에 닿지 않음, 꼭지 제거 후 원형도
+    MIN_CIRCULARITY 이상, 외접원 채움 비율 MIN_BLOB_FILL 이상.
+    반환 항목: {"cx", "cy", "w", "h", "conf"}. w·h는 본체 외접원 지름, conf는 원형도.
+    """
+    height, width = mask.shape[:2]
     k = config.MASK_KERNEL_SIZE
     clean = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((k, k), np.uint8))
     contours, _ = cv2.findContours(clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     blobs = []
     for contour in contours:
-        area = cv2.contourArea(contour)
-        perimeter = cv2.arcLength(contour, True)
-        if area < config.MIN_BLOB_AREA or perimeter <= 0:
+        if cv2.contourArea(contour) < config.MIN_BLOB_AREA:
+            continue
+        x, y, w, h = cv2.boundingRect(contour)
+        if x <= 0 or y <= 0 or x + w >= width or y + h >= height:
+            continue  # 화면 밖으로 잘린 덩어리는 모양·크기를 판단할 수 없음
+        body = _blob_body(contour)
+        if body is None:
+            continue
+        area = cv2.contourArea(body)
+        perimeter = cv2.arcLength(body, True)
+        if perimeter <= 0:
             continue
         circularity = 4 * math.pi * area / perimeter**2
-        if circularity < config.MIN_CIRCULARITY:
+        (cx, cy), radius = cv2.minEnclosingCircle(body)
+        fill = area / (math.pi * radius**2) if radius > 0 else 0.0
+        if circularity < config.MIN_CIRCULARITY or fill < config.MIN_BLOB_FILL:
             continue
-        (cx, cy), radius = cv2.minEnclosingCircle(contour)
         blobs.append({"cx": cx, "cy": cy, "w": 2 * radius, "h": 2 * radius, "conf": circularity})
     return blobs
+
+
+def _center_inside(item: dict, box: dict) -> bool:
+    """item 중심이 box 상자(cx, cy, w, h) 안에 있으면 True."""
+    return (
+        abs(item["cx"] - box["cx"]) <= box["w"] / 2 and abs(item["cy"] - box["cy"]) <= box["h"] / 2
+    )
 
 
 def to_world(det: dict, pose: Sequence[float]) -> tuple[float, float]:
@@ -131,6 +170,9 @@ class TargetDetector:
         # 마지막 detect_all() 호출의 YOLO 원본 상자(색 판별 탈락 포함)와 추론 시간 [ms]. 측정·튜닝용
         self.last_yolo: list[dict] = []
         self.last_yolo_ms: float | None = None
+        # 마지막 detect_all() 결과와 누적 호출 횟수. 다른 모듈이 실행한 검출 결과를 재사용할 때 사용
+        self.last_detections: list[dict] = []
+        self.detect_count = 0
         if model_path is not None:
             try:
                 from ultralytics import YOLO
@@ -147,7 +189,11 @@ class TargetDetector:
         start = time.perf_counter()
         try:
             result = self.model.predict(
-                bgr, conf=config.YOLO_CONF, classes=config.YOLO_CLASSES, verbose=False
+                bgr,
+                conf=config.YOLO_CONF,
+                classes=config.YOLO_CLASSES,
+                agnostic_nms=True,  # 클래스 무관 NMS. 한 사과의 apple·sports ball 중복 방지
+                verbose=False,
             )[0]
         except Exception as exc:  # noqa: BLE001 - 추론 실패 프레임은 색 분할로 대체
             self.last_error = f"{type(exc).__name__}: {exc}"
@@ -166,6 +212,8 @@ class TargetDetector:
         """대상 검출 결과 전체를 가까운 순서로 반환. 이미지가 None이면 빈 목록."""
         if bgr is None:
             self.last_yolo = []
+            self.last_detections = []
+            self.detect_count += 1
             return []
         height, width = bgr.shape[:2]
         mask = color_mask(bgr, self.ranges)
@@ -188,10 +236,12 @@ class TargetDetector:
                     "source": "yolo",
                 }
             )
-        if not candidates and config.USE_COLOR_FALLBACK:
-            candidates = [
-                {**blob, "cls": None, "source": "color"} for blob in find_color_blobs(mask)
-            ]
+        if config.USE_COLOR_FALLBACK:
+            yolo_targets = list(candidates)
+            for blob in find_color_blobs(mask):
+                if any(_center_inside(blob, box) for box in yolo_targets):
+                    continue  # YOLO가 이미 찾은 대상
+                candidates.append({**blob, "cls": None, "source": "color"})
 
         detections = []
         for det in candidates:
@@ -204,6 +254,8 @@ class TargetDetector:
                 continue
             detections.append({**det, "color": self.color, "dist": dist, "bearing": bearing})
         detections.sort(key=lambda d: d["dist"])
+        self.last_detections = detections
+        self.detect_count += 1
         return detections
 
     def detect(self, bgr: np.ndarray | None) -> dict | None:

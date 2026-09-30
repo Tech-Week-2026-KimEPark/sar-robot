@@ -16,6 +16,7 @@ sar-robot 모듈의 구현 상태와 코드 위치를 정리한 문서입니다.
 | `sar/robot_io.py` | `RobotIO.lidar()` | 없음 | 거리 360개 [m]. 장치가 없으면 `None` |
 | `sar/robot_io.py` | `RobotIO.camera_bgr()` | 없음 | `(480, 640, 3)` BGR 이미지. 없으면 `None` |
 | `sar/robot_io.py` | `RobotIO.drive(v, w)` | 속도 명령 [m/s, rad/s] | 없음 |
+| `sar/robot_io.py` | `RobotIO.keys()` | 없음 | `(눌린 키 이름 집합, Shift 여부)`. 문자 키는 소문자, 방향키는 `"up"` 등. Webots 3D 화면 포커스 필요 |
 | `sar/odometry.py` | `Odometry(x, y, theta)` | 시작 pose | 객체 |
 | `sar/odometry.py` | `Odometry.update(enc_l, enc_r, compass=None)` | 누적 회전각 [rad], 보정된 나침반 방향 [rad] | 없음. 첫 호출은 기준값 저장 |
 | `sar/odometry.py` | `Odometry.pose()` | 없음 | `(x, y, theta)` |
@@ -114,11 +115,11 @@ $$
 |---|---|---|
 | YOLO 후보 | `YOLO_CLASSES`, `YOLO_CONF` | apple, orange, sports ball |
 | 색 판별 | `HSV_RANGES`, `COLOR_RATIO_MIN` | YOLO 상자 안 대상 색 픽셀 비율 하한 |
-| 색 분할 대체 | `USE_COLOR_FALLBACK`, `MIN_BLOB_AREA`, `MIN_CIRCULARITY` | YOLO 대상이 없을 때만 실행 |
+| 색 분할 보완 | `USE_COLOR_FALLBACK`, `MIN_BLOB_AREA`, `MIN_CIRCULARITY`, `MIN_BLOB_FILL`, `BLOB_OPEN_RATIO` | YOLO 대상 상자 밖의 덩어리만 추가. 화면 가장자리에 닿은 덩어리 제외. 꼭지 같은 가는 돌출부를 지운 본체로 원형도·외접원 채움 비율 판정 |
 | 높이 제외 | `HORIZON_MARGIN` | 중심이 화면 가운데선보다 이 값 이상 위면 식탁 위 물체로 제외 |
 | 연속 확인 | `CONFIRM_FRAMES`, `CONFIRM_MATCH_RADIUS` | 연속 검출 위치가 반경을 벗어나면 기록 초기화 |
 | 위치 추정 | `CONFIRM_MIN_DIST` | 가중치 $1 / \max(d, d_{\min})^2$의 거리 가중 평균 |
 
 `detect()`는 호출할 때마다 YOLO를 실행합니다. 미션 루프에서 `YOLO_EVERY` step마다 호출하십시오. YOLO 로드에 실패하면 `load_error`에 사유를 기록하고 색 분할만 사용합니다.
 
-측정·튜닝용으로 `TargetDetector`는 마지막 `detect_all()` 호출의 YOLO 결과를 보관합니다. `last_yolo`는 색 판별에서 탈락한 상자를 포함한 원본 상자 목록입니다. 각 항목은 `xyxy`, `conf`, `cls`, `ratio`(상자 안 대상 색 비율) 키를 가집니다. `last_yolo_ms`는 YOLO 추론 1회 시간 [ms]입니다.
+측정·튜닝용으로 `TargetDetector`는 마지막 `detect_all()` 호출의 YOLO 결과를 보관합니다. `last_yolo`는 색 판별에서 탈락한 상자를 포함한 원본 상자 목록입니다. 각 항목은 `xyxy`, `conf`, `cls`, `ratio`(상자 안 대상 색 비율) 키를 가집니다. `last_yolo_ms`는 YOLO 추론 1회 시간 [ms]입니다. `last_detections`는 마지막 검출 결과 목록, `detect_count`는 `detect_all()` 누적 호출 횟수입니다. 다른 모듈이 실행한 검출 결과를 YOLO를 다시 실행하지 않고 재사용할 때 사용합니다.

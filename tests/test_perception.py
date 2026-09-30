@@ -141,6 +141,7 @@ class _FakeYolo:
         self.boxes = boxes  # [(x1, y1, x2, y2, conf, cls), ...]
 
     def predict(self, image, **kwargs):
+        self.kwargs = kwargs
         rows = self.boxes or np.zeros((0, 6))
         arr = np.asarray(rows, float).reshape(-1, 6)
         boxes = types.SimpleNamespace(
@@ -260,3 +261,59 @@ def test_last_yolo_keeps_rejected_boxes_with_ratio():
     assert detector.last_yolo_ms is not None
     detector.detect_all(None)
     assert detector.last_yolo == []
+
+
+def test_yolo_target_not_duplicated_by_color():
+    image = draw_ball(blank(), 400, 300, 15, RED)
+    detections = detector_with_yolo([(385, 285, 415, 315, 0.8, 47)]).detect_all(image)
+    assert [d["source"] for d in detections] == ["yolo"]
+
+
+def test_color_adds_second_apple_missed_by_yolo():
+    # 병합 분석 6.1절 8번: YOLO가 한 사과만 찾으면 두 번째 사과가 누락되던 문제
+    image = blank()
+    draw_ball(image, 450, 320, 20, RED)  # 가까운 사과, YOLO 검출
+    draw_ball(image, 150, 300, 8, RED)  # 먼 사과, YOLO 미검출
+    detections = detector_with_yolo([(430, 300, 470, 340, 0.7, 47)]).detect_all(image)
+    assert [d["source"] for d in detections] == ["yolo", "color"]
+    assert detections[1]["cx"] == pytest.approx(150, abs=1)
+
+
+def test_yolo_uses_class_agnostic_nms():
+    # 실제 프레임에서 한 사과가 apple·sports ball 두 상자로 검출되던 문제
+    detector = detector_with_yolo([(385, 285, 415, 315, 0.8, 47)])
+    detector.detect_all(draw_ball(blank(), 400, 300, 15, RED))
+    assert detector.model.kwargs["agnostic_nms"] is True
+    assert detector.model.kwargs["verbose"] is False
+
+
+def test_edge_clipped_blob_ignored():
+    # Webots 프레임: 화면 왼쪽 끝에 잘린 소화기 아랫부분이 사과로 오검출되던 사례
+    image = draw_ball(blank(), 5, 300, 18, RED)
+    assert TargetDetector("red", model_path=None).detect(image) is None
+
+
+def test_square_block_ignored():
+    # 소화기처럼 라벨로 잘린 사각형 조각. 원형도는 약 0.785로 높지만 외접원 채움 비율 0.64
+    image = blank()
+    cv2.rectangle(image, (300, 280), (330, 310), RED, -1)
+    assert TargetDetector("red", model_path=None).detect(image) is None
+
+
+def test_apple_with_stem_uses_body_diameter():
+    # 가까운 사과는 꼭지가 크게 보여 원형도·외접원이 왜곡됨. 꼭지를 제거한 본체로 판정
+    image = draw_ball(blank(), 320, 300, 45, RED)
+    cv2.rectangle(image, (317, 240), (323, 256), RED, -1)  # 꼭지
+    det = TargetDetector("red", model_path=None).detect(image)
+    assert det is not None
+    assert det["w"] == pytest.approx(90, abs=4)
+
+
+def test_last_detections_and_count():
+    detector = TargetDetector("red", model_path=None)
+    found = detector.detect_all(draw_ball(blank(), 400, 300, 15, RED))
+    assert detector.last_detections == found
+    assert detector.detect_count == 1
+    detector.detect_all(None)
+    assert detector.last_detections == []
+    assert detector.detect_count == 2
