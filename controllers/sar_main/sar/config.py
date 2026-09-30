@@ -61,6 +61,18 @@ FRONTIER_MIN_DIST = 0.3  # m, 이보다 가까운 프론티어 칸은 목표에�
 
 # 미션 상태 머신 (CONTEXT.md 7장)
 INIT_SPIN_W = 0.8  # rad/s, 시작 제자리 회전 속도 (1회전 약 7.9초)
+
+# 이동 중 둘러보기 (docs 탐색 개선 설계 4장). 문 통과 또는 일정 거리 이동 후 제자리 1회전
+LOOK_AROUND_ENABLED = False  # 가상 맵에서 효과 미확인. Webots 가구 환경에서 켜고 비교
+LOOK_W = 0.8  # rad/s, 둘러보기 회전 속도
+LOOK_DISTANCE = 4.0  # m, 마지막 둘러보기 뒤 EXPLORE 주행 거리가 이 값 이상이면 둘러보기
+LOOK_MIN_SPACING = 1.5  # m, 이전 둘러보기 위치에서 이 거리 이내면 생략
+DOOR_WIDTH_IN = 1.2  # m, 라이다 좌우 거리 합이 이 값 미만이면 좁은 통로 안
+DOOR_WIDTH_OUT = 2.0  # m, 좁은 통로 안에서 이 값을 넘으면 넓은 공간 진입 (문 통과)
+DOOR_SIDE_HALF = 10  # 라이다 인덱스, 좌(90)·우(270) 판정 범위 ±
+LOOK_PAUSE = 1.5  # s, 검출 시 회전을 멈추고 검출 방향을 보는 최대 시간
+LOOK_SEEN_HOLD = 0.6  # s, 마지막 검출 뒤 이 시간까지 검출 중으로 판단 (YOLO 약 2회)
+LOOK_TIMEOUT_FACTOR = 2.0  # 둘러보기 제한 시간 = 이 배수 x 1회전 시간
 COMPASS_SCALE_TOL = 0.5  # 오도메트리/나침반 회전 비율이 1에서 이만큼 벗어나면 나침반 미사용
 REPLAN_PERIOD = 2.0  # s, 프론티어 선택·경로 재계획 주기
 FRONTIER_TIMEOUT = 30.0  # s, 같은 프론티어 목표에 도달하지 못하면 블랙리스트
