@@ -135,3 +135,13 @@ def test_key_hold_expires_and_cancels_opposite():
     assert hold.held(1.35)[0] == {"s", "a"}
     hold.clear()
     assert hold.held(1.35)[0] == set()
+
+
+def test_map_view_limits_size():
+    from sar.grid_map import GridMap
+
+    grid = GridMap()
+    grid.seen[:] = True  # 전체 확인 영역: 640 x 640칸, 확대 시 1280 px
+    image = hsv_tuner.map_view(grid, [(0.0, 0.0)], None, [], (0.0, 0.0), (0.0, 0.0, 0.0), "t")
+    assert max(image.shape[:2]) <= config.TUNER_MAP_VIEW_MAX
+    assert image.dtype.name == "uint8"

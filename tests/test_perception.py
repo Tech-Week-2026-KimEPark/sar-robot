@@ -307,3 +307,13 @@ def test_apple_with_stem_uses_body_diameter():
     det = TargetDetector("red", model_path=None).detect(image)
     assert det is not None
     assert det["w"] == pytest.approx(90, abs=4)
+
+
+def test_last_detections_and_count():
+    detector = TargetDetector("red", model_path=None)
+    found = detector.detect_all(draw_ball(blank(), 400, 300, 15, RED))
+    assert detector.last_detections == found
+    assert detector.detect_count == 1
+    detector.detect_all(None)
+    assert detector.last_detections == []
+    assert detector.detect_count == 2

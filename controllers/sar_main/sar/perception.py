@@ -170,6 +170,9 @@ class TargetDetector:
         # 마지막 detect_all() 호출의 YOLO 원본 상자(색 판별 탈락 포함)와 추론 시간 [ms]. 측정·튜닝용
         self.last_yolo: list[dict] = []
         self.last_yolo_ms: float | None = None
+        # 마지막 detect_all() 결과와 누적 호출 횟수. 다른 모듈이 실행한 검출 결과를 재사용할 때 사용
+        self.last_detections: list[dict] = []
+        self.detect_count = 0
         if model_path is not None:
             try:
                 from ultralytics import YOLO
@@ -209,6 +212,8 @@ class TargetDetector:
         """대상 검출 결과 전체를 가까운 순서로 반환. 이미지가 None이면 빈 목록."""
         if bgr is None:
             self.last_yolo = []
+            self.last_detections = []
+            self.detect_count += 1
             return []
         height, width = bgr.shape[:2]
         mask = color_mask(bgr, self.ranges)
@@ -249,6 +254,8 @@ class TargetDetector:
                 continue
             detections.append({**det, "color": self.color, "dist": dist, "bearing": bearing})
         detections.sort(key=lambda d: d["dist"])
+        self.last_detections = detections
+        self.detect_count += 1
         return detections
 
     def detect(self, bgr: np.ndarray | None) -> dict | None:

@@ -135,3 +135,6 @@ TUNER_APPROACH_V = 0.08  # m/s, 자동 접근 전진 속도
 TUNER_MEASURE_DISTS = (3.0, 2.0, 1.0)  # m, 자동 접근 측정 지점
 TUNER_STOP_DIST = 0.5  # m, 자동 접근 정지 거리
 TUNER_LOST_TIMEOUT = 2.0  # s, 대상 미검출이 이 시간 이상이면 다시 탐색
+TUNER_EXPLORE_LOG_PERIOD = 2.0  # s, 자동 탐색 중 검출이 있을 때 측정 기록 최소 간격
+TUNER_MAP_VIEW_PERIOD = 1.0  # s, 지도 창 갱신 주기 (시뮬레이션 시간)
+TUNER_MAP_VIEW_MAX = 600  # px, 지도 창 긴 변 최대 크기
