@@ -89,7 +89,11 @@ Intro의 실습 파일을 sar-robot에 복사했습니다. 복사한 컨트롤�
 
 `sar_mission` 컨트롤러와 `worlds/sar_dev.wbt`는 sar-robot에서 추가한 파일입니다.
 
-Intro 실습 파일이 갱신되면 저장소 루트에서 다음 명령으로 차이를 확인한 뒤 다시 복사하십시오. Intro 저장소가 형제 폴더 `../PNU-TECHWEEK-260930`에 있다고 가정합니다.
+`tests/test_intro_sync.py`는 Intro와 sar-robot의 Git 인덱스 blob 해시를 비교합니다. Intro 저장소가 형제 폴더 `../PNU-TECHWEEK-260930`에 있으면 `pytest`에서 누락·변경 파일을 검출합니다. 2026-09-30 기준 Intro 추적 파일 27개가 모두 동일합니다.
+
+Webots는 월드를 열 때 `worlds/.*.wbproj`(창 배치 상태)를 자동으로 수정합니다. 이 변경은 커밋하지 말고 `git checkout -- worlds/.*.wbproj`로 되돌리십시오.
+
+Intro 실습 파일이 갱신되면 저장소 루트에서 다음 명령으로 차이를 확인한 뒤 다시 복사하십시오.
 
 ```bash
 diff -r -x .DS_Store ../PNU-TECHWEEK-260930/controllers controllers
@@ -103,6 +107,6 @@ diff -r -x .DS_Store ../PNU-TECHWEEK-260930/worlds worlds
 | 패키지 설치 위치 | 시스템 Python에 `pip install` | 저장소 `.venv` | 팀원 PC마다 같은 버전 유지 |
 | Webots Python | 시스템 `python3` | Preferences의 Python command를 `.venv/bin/python`으로 설정 | macOS 기본 `python3`는 3.9이며 패키지 없음 |
 | 팀 코드 import | 없음 | `pip install -e .`로 `sar` 패키지 설치 | 컨트롤러에서 `src/sar` import |
-| Webots 원격 에셋 | 자동 다운로드 | `scripts/prefetch_webots_assets.py`로 사전 캐시 | macOS Webots R2025a의 HTTP/2 다운로드 오류 |
+| Webots 원격 PROTO·에셋 | 자동 다운로드 | `scripts/prefetch_webots_assets.py`로 사전 캐시 | macOS Webots R2025a의 다운로드 오류(`error code: 399`, `error code: 2`) |
 
 설치 절차는 [개발 환경 설정](../how-to/dev-setup.md)에 있습니다.
