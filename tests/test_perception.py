@@ -285,3 +285,25 @@ def test_yolo_uses_class_agnostic_nms():
     detector.detect_all(draw_ball(blank(), 400, 300, 15, RED))
     assert detector.model.kwargs["agnostic_nms"] is True
     assert detector.model.kwargs["verbose"] is False
+
+
+def test_edge_clipped_blob_ignored():
+    # Webots 프레임: 화면 왼쪽 끝에 잘린 소화기 아랫부분이 사과로 오검출되던 사례
+    image = draw_ball(blank(), 5, 300, 18, RED)
+    assert TargetDetector("red", model_path=None).detect(image) is None
+
+
+def test_square_block_ignored():
+    # 소화기처럼 라벨로 잘린 사각형 조각. 원형도는 약 0.785로 높지만 외접원 채움 비율 0.64
+    image = blank()
+    cv2.rectangle(image, (300, 280), (330, 310), RED, -1)
+    assert TargetDetector("red", model_path=None).detect(image) is None
+
+
+def test_apple_with_stem_uses_body_diameter():
+    # 가까운 사과는 꼭지가 크게 보여 원형도·외접원이 왜곡됨. 꼭지를 제거한 본체로 판정
+    image = draw_ball(blank(), 320, 300, 45, RED)
+    cv2.rectangle(image, (317, 240), (323, 256), RED, -1)  # 꼭지
+    det = TargetDetector("red", model_path=None).detect(image)
+    assert det is not None
+    assert det["w"] == pytest.approx(90, abs=4)

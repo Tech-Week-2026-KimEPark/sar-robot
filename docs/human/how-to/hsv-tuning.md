@@ -104,7 +104,7 @@ python scripts/analyze_measurements.py controllers/hsv_tuner/output/measurements
 - 1 m, 2 m, 3 m 측정에서 추정 거리가 실제 거리와 비슷함
 - 다른 색 사과, 나무 바닥, 식탁 위 과일에 대상 상자가 표시되지 않음
 
-식탁 위 과일이 검출되면 `HORIZON_MARGIN`을 줄이십시오. 멀리 있는 사과를 놓치면 `MIN_BLOB_AREA`를 줄이십시오.
+식탁 위 과일이 검출되면 `HORIZON_MARGIN`을 줄이십시오. 멀리 있는 사과를 놓치면 `MIN_BLOB_AREA`를 줄이십시오. 사과가 아닌 빨간 물체(소화기, 표지판 등)가 색 분할로 검출되면 `MIN_BLOB_FILL`을 올리십시오. 2026-09-30 측정에서 실제 사과의 채움 비율은 0.85 이상, 빨간 방해 물체는 0.64 이하였습니다.
 
 ## 관련 자료
 

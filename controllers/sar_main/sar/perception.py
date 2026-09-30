@@ -68,24 +68,55 @@ def box_color_ratio(mask: np.ndarray, x1: float, y1: float, x2: float, y2: float
     return float(np.count_nonzero(mask[r1:r2, c1:c2])) / ((r2 - r1) * (c2 - c1))
 
 
-def find_color_blobs(mask: np.ndarray) -> list[dict]:
-    """마스크에서 면적·원형도 조건을 만족하는 원형 덩어리 목록 반환.
+def _blob_body(contour: np.ndarray) -> np.ndarray | None:
+    """덩어리에서 꼭지 같은 가는 돌출부를 지운 본체 윤곽. 본체가 사라지면 None.
 
-    반환 항목: {"cx", "cy", "w", "h", "conf"}. w·h는 외접원 지름, conf는 원형도.
+    열림 연산 커널은 덩어리 짧은 변의 BLOB_OPEN_RATIO배. 3 px 미만이면 원래 윤곽 사용.
     """
+    x, y, w, h = cv2.boundingRect(contour)
+    size = round(min(w, h) * config.BLOB_OPEN_RATIO)
+    if size < config.MASK_KERNEL_SIZE:
+        return contour
+    blob = np.zeros((h + 2, w + 2), np.uint8)
+    cv2.drawContours(blob, [contour - (x - 1, y - 1)], -1, 255, -1)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size | 1, size | 1))
+    body = cv2.morphologyEx(blob, cv2.MORPH_OPEN, kernel)
+    parts, _ = cv2.findContours(body, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not parts:
+        return None
+    return max(parts, key=cv2.contourArea) + (x - 1, y - 1)
+
+
+def find_color_blobs(mask: np.ndarray) -> list[dict]:
+    """마스크에서 사과 모양 덩어리 목록 반환.
+
+    조건: 면적 MIN_BLOB_AREA 이상, 화면 가장자리에 닿지 않음, 꼭지 제거 후 원형도
+    MIN_CIRCULARITY 이상, 외접원 채움 비율 MIN_BLOB_FILL 이상.
+    반환 항목: {"cx", "cy", "w", "h", "conf"}. w·h는 본체 외접원 지름, conf는 원형도.
+    """
+    height, width = mask.shape[:2]
     k = config.MASK_KERNEL_SIZE
     clean = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((k, k), np.uint8))
     contours, _ = cv2.findContours(clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     blobs = []
     for contour in contours:
-        area = cv2.contourArea(contour)
-        perimeter = cv2.arcLength(contour, True)
-        if area < config.MIN_BLOB_AREA or perimeter <= 0:
+        if cv2.contourArea(contour) < config.MIN_BLOB_AREA:
+            continue
+        x, y, w, h = cv2.boundingRect(contour)
+        if x <= 0 or y <= 0 or x + w >= width or y + h >= height:
+            continue  # 화면 밖으로 잘린 덩어리는 모양·크기를 판단할 수 없음
+        body = _blob_body(contour)
+        if body is None:
+            continue
+        area = cv2.contourArea(body)
+        perimeter = cv2.arcLength(body, True)
+        if perimeter <= 0:
             continue
         circularity = 4 * math.pi * area / perimeter**2
-        if circularity < config.MIN_CIRCULARITY:
+        (cx, cy), radius = cv2.minEnclosingCircle(body)
+        fill = area / (math.pi * radius**2) if radius > 0 else 0.0
+        if circularity < config.MIN_CIRCULARITY or fill < config.MIN_BLOB_FILL:
             continue
-        (cx, cy), radius = cv2.minEnclosingCircle(contour)
         blobs.append({"cx": cx, "cy": cy, "w": 2 * radius, "h": 2 * radius, "conf": circularity})
     return blobs
 

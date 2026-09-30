@@ -115,7 +115,7 @@ $$
 |---|---|---|
 | YOLO 후보 | `YOLO_CLASSES`, `YOLO_CONF` | apple, orange, sports ball |
 | 색 판별 | `HSV_RANGES`, `COLOR_RATIO_MIN` | YOLO 상자 안 대상 색 픽셀 비율 하한 |
-| 색 분할 보완 | `USE_COLOR_FALLBACK`, `MIN_BLOB_AREA`, `MIN_CIRCULARITY` | YOLO 대상 상자 밖의 덩어리만 추가 |
+| 색 분할 보완 | `USE_COLOR_FALLBACK`, `MIN_BLOB_AREA`, `MIN_CIRCULARITY`, `MIN_BLOB_FILL`, `BLOB_OPEN_RATIO` | YOLO 대상 상자 밖의 덩어리만 추가. 화면 가장자리에 닿은 덩어리 제외. 꼭지 같은 가는 돌출부를 지운 본체로 원형도·외접원 채움 비율 판정 |
 | 높이 제외 | `HORIZON_MARGIN` | 중심이 화면 가운데선보다 이 값 이상 위면 식탁 위 물체로 제외 |
 | 연속 확인 | `CONFIRM_FRAMES`, `CONFIRM_MATCH_RADIUS` | 연속 검출 위치가 반경을 벗어나면 기록 초기화 |
 | 위치 추정 | `CONFIRM_MIN_DIST` | 가중치 $1 / \max(d, d_{\min})^2$의 거리 가중 평균 |
