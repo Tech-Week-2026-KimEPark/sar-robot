@@ -248,3 +248,15 @@ def test_confirm_min_dist_clamp():
     confirm.update(True, (0.0, 0.0), 0.01)  # 0.3 m로 취급, 가중치 1/0.09
     _, xy = confirm.update(True, (0.3, 0.0), 0.3)  # 같은 가중치
     assert xy == pytest.approx((0.15, 0.0))
+
+
+def test_last_yolo_keeps_rejected_boxes_with_ratio():
+    image = blank()
+    draw_ball(image, 200, 300, 15, GREEN)
+    detector = detector_with_yolo([(185, 285, 215, 315, 0.9, 47)])
+    detector.detect_all(image)
+    assert len(detector.last_yolo) == 1
+    assert detector.last_yolo[0]["ratio"] < config.COLOR_RATIO_MIN
+    assert detector.last_yolo_ms is not None
+    detector.detect_all(None)
+    assert detector.last_yolo == []

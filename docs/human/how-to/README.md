@@ -5,4 +5,4 @@
 ## 목록
 
 - [개발 환경 설정](dev-setup.md)
-- [HSV 임계값 튜닝](hsv-tuning.md)
+- [HSV 임계값 튜닝과 인식 성능 측정](hsv-tuning.md)

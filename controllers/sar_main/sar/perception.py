@@ -10,6 +10,7 @@
 """
 
 import math
+import time
 from collections.abc import Iterable, Sequence
 
 import cv2
@@ -127,6 +128,9 @@ class TargetDetector:
         self.model = None
         self.load_error: str | None = None
         self.last_error: str | None = None
+        # 마지막 detect_all() 호출의 YOLO 원본 상자(색 판별 탈락 포함)와 추론 시간 [ms]. 측정·튜닝용
+        self.last_yolo: list[dict] = []
+        self.last_yolo_ms: float | None = None
         if model_path is not None:
             try:
                 from ultralytics import YOLO
@@ -140,6 +144,7 @@ class TargetDetector:
     def _yolo_boxes(self, bgr: np.ndarray) -> list[dict]:
         if self.model is None:
             return []
+        start = time.perf_counter()
         try:
             result = self.model.predict(
                 bgr, conf=config.YOLO_CONF, classes=config.YOLO_CLASSES, verbose=False
@@ -147,6 +152,7 @@ class TargetDetector:
         except Exception as exc:  # noqa: BLE001 - 추론 실패 프레임은 색 분할로 대체
             self.last_error = f"{type(exc).__name__}: {exc}"
             return []
+        self.last_yolo_ms = (time.perf_counter() - start) * 1000
         boxes = result.boxes
         xyxy = boxes.xyxy.cpu().numpy()
         confs = boxes.conf.cpu().numpy()
@@ -159,14 +165,17 @@ class TargetDetector:
     def detect_all(self, bgr: np.ndarray | None) -> list[dict]:
         """대상 검출 결과 전체를 가까운 순서로 반환. 이미지가 None이면 빈 목록."""
         if bgr is None:
+            self.last_yolo = []
             return []
         height, width = bgr.shape[:2]
         mask = color_mask(bgr, self.ranges)
 
         candidates = []
-        for box in self._yolo_boxes(bgr):
+        self.last_yolo = self._yolo_boxes(bgr)
+        for box in self.last_yolo:
             x1, y1, x2, y2 = box["xyxy"]
-            if box_color_ratio(mask, x1, y1, x2, y2) < config.COLOR_RATIO_MIN:
+            box["ratio"] = box_color_ratio(mask, x1, y1, x2, y2)
+            if box["ratio"] < config.COLOR_RATIO_MIN:
                 continue
             candidates.append(
                 {
