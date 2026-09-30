@@ -8,6 +8,7 @@
 | EXPLORE | 미구조 후보 또는 프론티어로 이동. 대상 확정 시 APPROACH |
 | APPROACH | 대상 앞 APPROACH_DIST 지점으로 이동 후 정면 정렬 |
 | RESCUE | RESCUE_HOLD 정지, 위치·시각 기록, 지도 저장 |
+| LOOK_AROUND | 문 통과·일정 거리 이동 후 제자리 1회전. 카메라 사각 확인 |
 | RETURN | 시작점으로 이동 (모르는 칸 통과 허용) |
 | RECOVERY | 후진 후 넓은 쪽으로 회전, 이전 상태로 복귀 |
 | DONE | 정지, 최종 지도 저장 |
@@ -33,6 +34,7 @@ INIT_SPIN, EXPLORE, APPROACH, RESCUE, RETURN, RECOVERY, DONE = (
     "RECOVERY",
     "DONE",
 )
+LOOK_AROUND = "LOOK_AROUND"
 _MOVING = (EXPLORE, APPROACH, RETURN)
 
 Point = tuple[float, float]
@@ -113,6 +115,16 @@ class Mission:
         self._stuck_ref = (x, y, 0.0)
         self._resume = EXPLORE
         self._turn_dir = 1.0
+        # 이동 중 둘러보기
+        self.look_spots: list[Point] = []
+        self._since_look = 0.0  # 마지막 둘러보기 뒤 EXPLORE 주행 거리 [m]
+        self._explore_prev: Point | None = None
+        self._in_doorway = False
+        self._look_turn = 0.0
+        self._look_last: float | None = None
+        self._look_pause_t: float | None = None
+        self._last_seen_t = -math.inf
+        self._last_seen_bearing = 0.0
         # 출력
         self.trajectory: list[Point] = [self.start]
         self._map_t = -math.inf
@@ -131,7 +143,12 @@ class Mission:
         self.odom.update(*self.io.encoders(), compass=heading)
         pose = self.odom.pose()
         self.grid.update(pose, ranges)
-        if self.steps % config.YOLO_EVERY == 0 and self.state in (INIT_SPIN, EXPLORE, APPROACH):
+        if self.steps % config.YOLO_EVERY == 0 and self.state in (
+            INIT_SPIN,
+            EXPLORE,
+            APPROACH,
+            LOOK_AROUND,
+        ):
             self._perceive(pose)
         self.steps += 1
 
@@ -179,6 +196,10 @@ class Mission:
     def _explore(self, pose, ranges) -> tuple[float, float]:
         if self.target is not None:
             self._set_state(APPROACH, self._target_text())
+            return 0.0, 0.0
+        reason = self._look_trigger(pose, ranges)
+        if reason is not None:
+            self._set_state(LOOK_AROUND, reason)
             return 0.0, 0.0
         x, y, _ = pose
         # 미구조 후보를 프론티어보다 먼저 확인 (과제 문서 8.2절)
@@ -277,6 +298,31 @@ class Mission:
         self._set_state(self._resume, "복구 완료")
         return 0.0, 0.0
 
+    def _look_around(self, pose, ranges) -> tuple[float, float]:
+        """제자리 1회전. 검출이 있으면 LOOK_PAUSE 동안 검출 방향을 보며 연속 확인을 기다림."""
+        if self.target is not None:
+            self._set_state(APPROACH, self._target_text())
+            return 0.0, 0.0
+        # 회전량은 INIT_SPIN과 같이 나침반 원시각 변화로 계산 (없으면 오도메트리 방향)
+        raw = compass_angle(self._compass_vec) if self._compass_vec is not None else pose[2]
+        if self._look_last is not None:
+            self._look_turn += abs(wrap(raw - self._look_last))
+        self._look_last = raw
+        if self._look_turn >= 2 * math.pi:
+            self._set_state(EXPLORE, "둘러보기 완료")
+            return 0.0, 0.0
+        if self.t - self.state_t > config.LOOK_TIMEOUT_FACTOR * 2 * math.pi / config.LOOK_W:
+            self._set_state(EXPLORE, "둘러보기 제한 시간 초과")
+            return 0.0, 0.0
+        if self.t - self._last_seen_t <= config.LOOK_SEEN_HOLD:
+            if self._look_pause_t is None:
+                self._look_pause_t = self.t
+            if self.t - self._look_pause_t <= config.LOOK_PAUSE:
+                return 0.0, self._face(self._last_seen_bearing)
+        else:
+            self._look_pause_t = None  # 검출이 끊기면 다음 검출에서 다시 멈춤
+        return 0.0, config.LOOK_W
+
     def _done(self, pose, ranges) -> tuple[float, float]:
         return 0.0, 0.0
 
@@ -288,6 +334,7 @@ class Mission:
         RETURN: _return,
         RECOVERY: _recovery,
         DONE: _done,
+        LOOK_AROUND: _look_around,
     }
 
     # 인식
@@ -300,6 +347,9 @@ class Mission:
             xy = tuple(self.detector.to_world(det, pose))
             if not is_excluded(xy, found):
                 seen.append((xy, det))
+        if seen:
+            self._last_seen_t = self.t
+            self._last_seen_bearing = seen[0][1]["bearing"]
         if self.target is not None:
             # 확정된 대상이 있으면 일치 검출로 위치만 갱신하고 나머지는 후보로 저장
             for xy, det in seen:
@@ -353,6 +403,14 @@ class Mission:
         self._blocked_since = None
         x, y, _ = self.odom.pose()
         self._stuck_ref = (x, y, self.t)
+        if new == LOOK_AROUND:
+            self.look_spots.append((x, y))
+            self._since_look = 0.0
+            self._look_turn = 0.0
+            self._look_last = None
+            self._look_pause_t = None
+        if new == EXPLORE:
+            self._explore_prev = None  # 다른 상태에서 이동한 거리는 둘러보기 거리에 넣지 않음
         if new == APPROACH and old != RECOVERY:
             self._approach_t = self.t  # RECOVERY 복귀는 접근 제한 시간을 초기화하지 않음
         if new == RESCUE:
@@ -377,6 +435,44 @@ class Mission:
         self.log(f"[t={self.t:.1f}s] 목표 ({self.goal[0]:.2f},{self.goal[1]:.2f}) 제외: {reason}")
         self.goal = None
         self.path = None
+
+    def _passage_width(self, ranges) -> float | None:
+        """라이다 왼쪽(인덱스 90)·오른쪽(270) 주변 최솟값의 합 [m]. 라이다가 없으면 None."""
+        if not ranges:
+            return None
+        n = len(ranges)
+        half = max(1, config.DOOR_SIDE_HALF * n // 360)
+
+        def side(center: int) -> float:
+            return min(ranges[(center + k) % n] for k in range(-half, half + 1))
+
+        return side(n // 4) + side(3 * n // 4)
+
+    def _look_trigger(self, pose, ranges) -> str | None:
+        """EXPLORE 매 step 호출. 둘러보기를 시작해야 하면 사유, 아니면 None."""
+        x, y, _ = pose
+        if self._explore_prev is not None:
+            self._since_look += math.dist(self._explore_prev, (x, y))
+        self._explore_prev = (x, y)
+        reason = None
+        width = self._passage_width(ranges)
+        if width is not None:
+            if not self._in_doorway and width < config.DOOR_WIDTH_IN:
+                self._in_doorway = True
+            elif self._in_doorway and width > config.DOOR_WIDTH_OUT:
+                self._in_doorway = False
+                reason = "문 통과"
+        if reason is None and self._since_look >= config.LOOK_DISTANCE:
+            reason = f"{config.LOOK_DISTANCE:.0f} m 이동"
+        if reason is None or not config.LOOK_AROUND_ENABLED:
+            return None
+        spin_time = 2 * math.pi / config.LOOK_W
+        near = any(math.dist(s, (x, y)) < config.LOOK_MIN_SPACING for s in self.look_spots)
+        late = self.t + spin_time >= config.TIME_LIMIT - config.RETURN_RESERVE
+        if near or late:
+            self._since_look = 0.0  # 거리 조건이 매 step 다시 걸리지 않게 초기화
+            return None
+        return reason
 
     def _face(self, bearing: float) -> float:
         return max(-config.W_MAX, min(config.W_MAX, config.FACE_GAIN * bearing))

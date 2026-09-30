@@ -184,3 +184,28 @@ def test_full_mission_rescues_two_apples_and_returns(map_dir):
     assert math.hypot(io.x, io.y) <= config.RETURN_TOL
     assert (map_dir / "map_final.png").exists()
     assert (map_dir / "map_rescue_2.png").exists()
+
+
+def test_look_around_door_trigger_and_full_turn(monkeypatch):
+    from sar.mission import LOOK_AROUND
+
+    monkeypatch.setattr(config, "LOOK_AROUND_ENABLED", True)
+    mission, _, _ = make_mission(move=True)
+    mission.state = EXPLORE
+    narrow = [math.inf] * 360
+    narrow[80:101] = [0.4] * 21  # 왼쪽 0.4 m
+    narrow[260:281] = [0.4] * 21  # 오른쪽 0.4 m
+    assert mission._look_trigger((0.0, 0.0, 0.0), narrow) is None  # 좁은 통로 진입
+    assert mission._look_trigger((0.1, 0.0, 0.0), [math.inf] * 360) == "문 통과"
+    mission._set_state(LOOK_AROUND, "문 통과")
+    t0 = mission.t
+    for _ in range(400):
+        mission.tick()
+        if mission.state != LOOK_AROUND:
+            break
+    assert mission.state == EXPLORE
+    spin = 2 * math.pi / config.LOOK_W
+    assert mission.t - t0 == pytest.approx(spin, rel=0.2)
+    # 같은 위치에서는 다시 둘러보지 않음
+    assert mission._look_trigger((0.1, 0.0, 0.0), narrow) is None
+    assert mission._look_trigger((0.1, 0.0, 0.0), [math.inf] * 360) is None
