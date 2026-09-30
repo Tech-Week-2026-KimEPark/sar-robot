@@ -44,16 +44,14 @@ sar-robot 모듈의 구현 상태와 코드 위치를 정리한 문서입니다.
 | `sar/planner.py` | `DistanceField.path(xy)` (추가) | 월드 좌표 | xy에서 기준점까지 경로. 도달 불가면 `None` |
 | `sar/local_control.py` | `pure_pursuit(pose, path, lookahead=config.LOOKAHEAD)` | pose `(x, y, theta)`, 경로 `[(x, y), ...]` | `(v, w, reached)`. 목표 각도 차이 55° 이상이면 제자리 회전 |
 | `sar/local_control.py` | `safety_filter(v, w, ranges)` | 속도 명령, 라이다 360개 | `(v, w, blocked)`. 정면 ±25° 콘 안 `config.STOP_DIST` 이내면 정지 |
+| `sar/mission.py` | `Mission(io, odom, grid, detector, log=None)` | `RobotIO`, `Odometry`, `GridMap`, `TargetDetector`, 로그 함수 | 미션 객체. 시작점은 생성 시 `odom.pose()` |
+| `sar/mission.py` | `Mission.tick()` | 없음 | 없음. 매 step 1회 호출 |
+| `sar/mission.py` | `fit_compass(samples)` (추가) | 시작 회전 `[(오도메트리 방향, 나침반 원시각), ...]` | `(sign, offset, scale)`. 회전량 부족·비율 불일치면 `None` |
+| `sar/mission.py` | `compass_heading(vec, sign, offset)` (추가) | 나침반 벡터, 보정값 | 보정된 방향 [rad] |
 
 LDS-01 라이다 인덱스는 180이 정면, 90이 왼쪽, 270이 오른쪽, 0이 뒤입니다. `compass()`는 원시 벡터를 반환합니다. 방향 [rad]으로 변환하고 부호·오프셋을 보정하는 작업은 미션의 INIT_SPIN 단계에서 수행합니다.
 
-## 미구현 모듈
-
-| 파일 | 주요 인터페이스 | 담당 |
-|---|---|---|
-| `sar/mission.py` | `Mission.tick()` | 통합 |
-
-구현하면 위 표에서 "구현된 인터페이스" 표로 옮기십시오. 함수 형식은 원본 문서 7.2절을 따르십시오.
+`Mission`의 상태 전환과 공통 규칙은 docs [mission 기능 설명](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/explanation/features/mission.md)에 있습니다. 로그는 `log` 함수로 전달하며 `sar_main.py`가 `print`를 넘깁니다.
 
 ## 지도와 경로 계획 사용 규칙
 
@@ -64,7 +62,7 @@ LDS-01 라이다 인덱스는 180이 정면, 90이 왼쪽, 270이 오른쪽, 0�
 | 호출 주기 | `GridMap.update()`는 매 step. `plan()`, `choose_frontier()`, `DistanceField`는 목표 변경, 경로 차단, 2초 주기에만 호출 |
 | 경로 형식 | 첫 점은 `start_xy`, 점 간격은 `PATH_STEP`. `pure_pursuit`에 그대로 전달 |
 | 통과 불가 시작·목표 | `SNAP_RADIUS` 안의 가장 가까운 통과 가능 칸을 경유. 목표를 옮긴 경우 경로 끝점은 대체 칸 중심 |
-| 복귀 | `DistanceField(grid, 시작점)`을 2초 주기로 갱신. `distance(pose)`로 남은 복귀 거리 확인, `path(pose)`로 복귀 경로 사용 |
+| 복귀 | `mission`은 `plan(grid, pose, 시작점, allow_unknown=True)`을 2초 주기로 호출. `DistanceField`는 복귀 거리 판단이 필요할 때 사용 |
 | A* 가속 | `plan(..., field=f)`에 목표 기준 `DistanceField`를 전달하면 휴리스틱으로 사용. 결과 경로 비용은 같음 |
 | 지도 그림 | `render_map(grid.public(), grid.to_cell, ...)` |
 
