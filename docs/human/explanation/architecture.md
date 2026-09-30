@@ -19,11 +19,13 @@ sar-robot/
 │       ├── local_control.py   pure pursuit 경로 추종, 라이다 안전 필터
 │       └── viz.py             지도·궤적·구조 위치 그림 저장
 ├── controllers/hsv_tuner/     HSV 임계값 튜닝 컨트롤러 (sar_main/sar 사용)
+├── controllers/sar_eval/      설계 근거 측정 컨트롤러 (같은 Mission 실행, 실제 pose 기록)
 ├── controllers/tb3_*/         Intro 실습 컨트롤러 8개 (원본 유지)
-├── scripts/                   Webots PROTO·에셋 사전 캐시, 경로 계획 성능 측정 스크립트
+├── scripts/                   Webots PROTO·에셋 사전 캐시, 경로 계획 성능 측정, 설계 근거 분석 스크립트
 ├── tests/                     pytest
 ├── worlds/*.wbt               Intro 실습 월드 7개
 ├── worlds/sar_apartment.wbt   검증 월드 (apartment.wbt 복사본, 컨트롤러 sar_main)
+├── worlds/sar_apartment_eval.wbt  측정 월드 (sar_apartment.wbt + supervisor, 컨트롤러 sar_eval)
 ├── worlds/sar_dev.wbt         개발용 월드 (Intro breakroom_teleop_yolo 복사본). 검증에 사용하지 않음
 ├── protos/                    목표 물체 사과 PROTO 4종
 └── models/YOLO/               YOLO 가중치 (Git 제외)

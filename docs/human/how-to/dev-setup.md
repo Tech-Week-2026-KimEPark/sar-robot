@@ -138,6 +138,25 @@ kill $PID
 
 Intro 실습 월드(`breakroom_teleop.wbt` 등)도 같은 방법으로 실행합니다.
 
+### 7. 설계 근거 측정
+
+설계 선택을 수치로 비교할 때는 측정 월드 `worlds/sar_apartment_eval.wbt`를 사용하십시오. 로봇 컨트롤러 `sar_eval`은 `sar_main`과 같은 `Mission`을 실행합니다. 매 step 센서 값과 Supervisor 실제 pose를 `controllers/sar_eval/output/<모드>/run.npz`에 기록합니다. 인식 step 카메라 화면은 `frames/`에 저장합니다. 실행은 `DONE` 1초 후 자동 종료됩니다.
+
+| `SAR_EVAL_MODE` | 조건 |
+|---|---|
+| `mission` (기본) | 현재 코드. 실제 pose는 기록에만 사용 |
+| `truth` | 오도메트리 대신 실제 pose를 미션에 입력. 위치 추정 오차 제거 조건 |
+| `explore`, `truth_explore` | 위 조건 + `TARGET_COUNT = 99`. 프론티어 소진까지 탐색 |
+
+`SAR_EVAL_SET`으로 설정값을 바꿔 실행할 수 있습니다. 예는 `SAR_EVAL_SET=CONFIRM_FRAMES=3`입니다. 결과 폴더 이름에 설정값이 추가됩니다.
+
+```bash
+SAR_EVAL_MODE=truth /Applications/Webots.app/Contents/MacOS/webots --batch --mode=fast --minimize --stdout --stderr --port=1297 worlds/sar_apartment_eval.wbt > eval.log 2>&1
+.venv/bin/python scripts/design_eval.py            # 전체 실험. --only L,P2 처럼 일부만 실행 가능
+```
+
+`scripts/design_eval.py`는 기록을 다시 계산해 조건별 지표를 `controllers/sar_eval/output/design/results.json`에 저장합니다. 그래프는 같은 폴더에 `design_*.png`로 저장합니다. 실험 목록과 결과는 docs [SAR 로봇 시스템 설계서](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/explanation/sar-시스템-설계.md)에 있습니다.
+
 ## 결과 확인
 
 - `pip check`: `No broken requirements found.`
