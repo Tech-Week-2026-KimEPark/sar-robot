@@ -81,3 +81,5 @@ $$
 | 위치 추정 | `CONFIRM_MIN_DIST` | 가중치 $1 / \max(d, d_{\min})^2$의 거리 가중 평균 |
 
 `detect()`는 호출할 때마다 YOLO를 실행합니다. 미션 루프에서 `YOLO_EVERY` step마다 호출하십시오. YOLO 로드에 실패하면 `load_error`에 사유를 기록하고 색 분할만 사용합니다.
+
+측정·튜닝용으로 `TargetDetector`는 마지막 `detect_all()` 호출의 YOLO 결과를 보관합니다. `last_yolo`는 색 판별에서 탈락한 상자를 포함한 원본 상자 목록입니다. 각 항목은 `xyxy`, `conf`, `cls`, `ratio`(상자 안 대상 색 비율) 키를 가집니다. `last_yolo_ms`는 YOLO 추론 1회 시간 [ms]입니다.
