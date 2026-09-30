@@ -87,7 +87,7 @@ Intro의 실습 파일을 sar-robot에 복사했습니다. 복사한 컨트롤�
 | 월드 | `apartment.wbt`, `breakroom_*.wbt` 5개, `empty.wbt` | 실습 월드. 숨김 파일 `.*.wbproj`는 Webots 화면 상태 |
 | PROTO | `RedApple`, `GreenApple`, `OrangeApple`, `PurpleApple` | 목표 물체 |
 
-`sar_main` 컨트롤러와 `worlds/sar_dev.wbt`는 sar-robot에서 추가한 파일입니다.
+`sar_main` 컨트롤러, `worlds/sar_apartment.wbt`, `worlds/sar_dev.wbt`는 sar-robot에서 추가한 파일입니다.
 
 `tests/test_intro_sync.py`는 Intro와 sar-robot의 Git 인덱스 blob 해시를 비교합니다. Intro 저장소가 형제 폴더 `../PNU-TECHWEEK-260930`에 있으면 `pytest`에서 누락·변경 파일을 검출합니다. 2026-09-30 기준 Intro 추적 파일 27개가 모두 동일합니다.
 
