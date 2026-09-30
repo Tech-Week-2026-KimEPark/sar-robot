@@ -17,6 +17,7 @@
 - 상수는 `controllers/sar_main/sar/config.py`에 정의하십시오.
 - `sar/` 모듈마다 `if __name__ == "__main__":` 단독 테스트를 작성하십시오.
 - Webots 동작 검증은 `worlds/sar_apartment.wbt`로만 수행하십시오. 이 월드는 대회 연습 맵 `apartment.wbt`에 `sar_main` 컨트롤러를 지정한 복사본입니다. `sar_dev.wbt` 등 다른 월드의 결과는 검증 결과로 보고하지 마십시오.
+- 실제 pose가 필요한 설계 근거 측정은 `worlds/sar_apartment_eval.wbt`(측정 컨트롤러 `sar_eval`)로 수행하십시오. `sar_apartment.wbt`와 로봇 `supervisor`·`controller` 필드만 다르고 같은 `Mission`을 실행합니다. 결과를 보고할 때 월드 이름과 `SAR_EVAL_MODE`를 함께 적으십시오. 측정 컨트롤러 밖의 팀 코드에서 Supervisor를 사용하지 마십시오.
 - Webots를 헤드리스로 실행했다면 직접 실행한 프로세스만 PID로 종료하십시오. `pkill -f webots`처럼 이름으로 종료하면 다른 팀원·세션의 Webots도 종료됩니다.
 - `controllers/tb3_*`와 `requirements*.txt`의 Intro 기준 버전은 변경하지 마십시오.
 - 브랜치 이름은 `<type>/<내용>` 형식입니다. AI 도구 이름을 넣지 마십시오.
