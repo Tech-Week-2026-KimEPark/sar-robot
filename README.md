@@ -8,9 +8,10 @@
 python3.12 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt
 .venv/bin/python -m pytest -q
+.venv/bin/python scripts/prefetch_webots_assets.py
 ```
 
-Webots에서 `worlds/sar_dev.wbt`를 열어 실행하십시오. 전체 절차는 [개발 환경 설정](docs/human/how-to/dev-setup.md)에 있습니다.
+Webots에서 `worlds/sar_dev.wbt`를 열어 실행하십시오. 마지막 명령은 Webots 텍스처 다운로드 오류를 방지하기 위한 에셋 사전 캐시입니다. 전체 절차는 [개발 환경 설정](docs/human/how-to/dev-setup.md)에 있습니다.
 
 ## 문서
 

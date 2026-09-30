@@ -6,7 +6,8 @@ sar-robot의 폴더 구성, 모듈 사이 데이터 흐름, 구조를 선택한 
 
 ```text
 sar-robot/
-├── controllers/sar_mission/   Webots 진입점과 runtime.ini
+├── controllers/sar_mission/   Webots 진입점(.venv 재실행, 루프)
+├── scripts/                   Webots 에셋 캐시 스크립트
 ├── src/sar/                   팀 코드 패키지
 │   ├── config.py              상수
 │   ├── geometry.py            좌표 규칙, Pose, 좌표 변환
@@ -14,6 +15,7 @@ sar-robot/
 │   └── localization/          Wheel Odometry
 ├── tests/                     pytest
 ├── worlds/sar_dev.wbt         개발용 월드 (Intro breakroom_teleop_yolo 복사본)
+├── worlds/webots_assets.txt   개발용 월드의 원격 에셋 URL 목록
 ├── protos/                    목표 물체 사과 PROTO 4종
 └── models/YOLO/               YOLO 가중치 (Git 제외)
 ```
@@ -46,9 +48,15 @@ flowchart LR
 
 Webots는 `controllers/<이름>/<이름>.py`를 실행합니다. 로직을 이 파일에 작성하면 Webots 없이 테스트할 수 없습니다. 팀 코드는 `src/sar/` 패키지에 작성하고 컨트롤러는 루프만 담당합니다. `from controller import ...`는 `robot_io.py`에만 두므로 나머지 모듈은 pytest와 CI에서 실행됩니다.
 
-### runtime.ini 사용
+### 컨트롤러의 가상환경 재실행
 
-Webots가 `sar` 패키지와 가상환경을 찾으려면 `PYTHONPATH`와 Python 실행 파일을 지정해야 합니다. Webots 환경설정에서 지정하면 PC마다 설정이 달라집니다. `runtime.ini`는 저장소에 포함되므로 clone 후 추가 설정이 없습니다.
+Webots가 `sar` 패키지와 가상환경의 numpy·OpenCV를 사용하려면 import 경로와 Python 실행 파일을 지정해야 합니다. Webots 환경설정에서 지정하면 PC마다 절대 경로가 달라집니다. `runtime.ini`의 `[python] COMMAND`는 상대 경로를 인식하지 않습니다(Webots R2025a에서 `"../../.venv/bin/python" was not found` 확인).
+
+그래서 `sar_mission.py`가 실행 직후 저장소 `.venv`의 Python으로 자신을 다시 실행합니다. macOS와 Linux는 `os.execv`로 프로세스를 교체하고, Windows는 자식 프로세스의 종료 코드를 전달합니다. Webots가 설정한 환경변수는 재실행한 프로세스에 그대로 전달되므로 `controller` 모듈 import와 시뮬레이터 연결이 유지됩니다. 재실행 전 코드는 macOS 기본 Python 3.9에서도 실행되도록 3.10 이상 문법을 사용하지 않습니다.
+
+### 원격 에셋 사전 캐시
+
+실습 월드는 Webots 기본 PROTO와 텍스처를 GitHub에서 내려받습니다. Webots R2025a의 Qt 6.5.3은 이 다운로드에서 HTTP/2 헤더 압축 오류(`error code: 399`)가 발생합니다. 같은 파일을 curl의 HTTP/2 요청으로 받으면 정상 수신되므로 서버가 아니라 Qt 구현의 문제입니다. Webots는 캐시 폴더에 URL의 SHA1 이름으로 파일이 있으면 네트워크 요청을 하지 않습니다. `scripts/prefetch_webots_assets.py`는 이 규칙에 맞춰 에셋을 HTTP/1.1로 미리 저장합니다.
 
 ### 모듈별 폴더
 
