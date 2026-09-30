@@ -1,0 +1,39 @@
+#VRML_SIM R2025a utf8
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/robotis/turtlebot/protos/TurtleBot3Burger.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/devices/robotis/protos/RobotisLds01.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/solids/protos/SolidBox.proto"
+WorldInfo {
+}
+Viewpoint {
+  orientation -0.5773 0.5773 0.5773 2.0944
+  position 0 0 3
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+RectangleArena {
+  floorSize 2 2
+}
+TurtleBot3Burger {
+  translation 0 0 0
+  rotation 0 0 1 0
+  controller "lidar_range_check"
+  extensionSlot [
+    RobotisLds01 {
+    }
+  ]
+}
+SolidBox {
+  translation 0.10 0 0.173
+  name "close box (front, 0.09m from origin, below minRange 0.12)"
+  size 0.02 0.3 0.1
+}
+SolidBox {
+  translation -0.20 0 0.173
+  name "far box (back, 0.19m from origin, above minRange)"
+  size 0.02 0.3 0.1
+}
