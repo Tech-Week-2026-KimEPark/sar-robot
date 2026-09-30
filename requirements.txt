@@ -1,3 +1,7 @@
-numpy==2.2.6
-opencv-python==4.12.0.88
-scipy==1.18.1
+# Intro 과정 노트북 기준 버전 (Python 3.10)
+numpy==1.23.5
+opencv-python==4.8.0.74
+scikit-image==0.19.3
+matplotlib==3.7.5
+scipy==1.15.3
+requests==2.34.2
