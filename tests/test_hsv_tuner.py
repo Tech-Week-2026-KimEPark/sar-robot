@@ -101,3 +101,37 @@ def test_summary_line():
     empty = hsv_tuner.summary_line(0.0, (0.0, 0.0, 0.0), [], [], {}, None, None)
     assert "target=none" in empty
     assert "yolo=-" in empty
+
+
+def test_cv2_key_name():
+    assert hsv_tuner.cv2_key_name(-1) == (None, False)
+    assert hsv_tuner.cv2_key_name(ord("w")) == ("w", False)
+    assert hsv_tuner.cv2_key_name(ord("W")) == ("w", True)
+    assert hsv_tuner.cv2_key_name(2490368) == ("up", False)
+    assert hsv_tuner.cv2_key_name(ord(" ")) == (" ", False)
+
+
+def test_drive_from_keys():
+    assert hsv_tuner.drive_from_keys(set(), False) == (0.0, 0.0)
+    assert hsv_tuner.drive_from_keys({"w"}, False) == pytest.approx((config.TUNER_V, 0.0))
+    assert hsv_tuner.drive_from_keys({"up", "left"}, False) == pytest.approx(
+        (config.TUNER_V, config.TUNER_W)
+    )
+    assert hsv_tuner.drive_from_keys({"w", "up"}, False)[0] == pytest.approx(config.TUNER_V)
+    assert hsv_tuner.drive_from_keys({"w", "s"}, False) == (0.0, 0.0)
+    fine = hsv_tuner.drive_from_keys({"d"}, True)
+    assert fine == pytest.approx((0.0, -config.TUNER_W * config.TUNER_FINE_SCALE))
+
+
+def test_key_hold_expires_and_cancels_opposite():
+    hold = hsv_tuner.KeyHold(hold=0.5)
+    hold.press("w", 0.0)
+    assert hold.held(0.4) == ({"w"}, False)
+    assert hold.held(0.6) == (set(), False)
+    hold.press("w", 1.0)
+    hold.press("a", 1.1, fine=True)
+    assert hold.held(1.2) == ({"w", "a"}, True)
+    hold.press("s", 1.3)  # 반대 방향 w 해제, a 유지
+    assert hold.held(1.35)[0] == {"s", "a"}
+    hold.clear()
+    assert hold.held(1.35)[0] == set()

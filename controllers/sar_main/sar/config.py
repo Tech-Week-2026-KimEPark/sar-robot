@@ -15,6 +15,7 @@ MAX_WHEEL_SPEED = 6.67  # rad/s, RotationalMotor maxVelocity
 LIDAR_NAME = "LDS-01"
 CAMERA_NAME = "camera"
 COMPASS_NAME = "compass"
+KEYBOARD_MAX_KEYS = 7  # Webots 키보드 동시 입력 최대 개수
 LEFT_MOTOR_NAME = "left wheel motor"
 RIGHT_MOTOR_NAME = "right wheel motor"
 
@@ -89,7 +90,7 @@ YOLO_CLASSES = [47, 49, 32]  # apple, orange, sports ball
 YOLO_CONF = 0.20
 YOLO_EVERY = 4  # 몇 스텝마다 추론
 COLOR_RATIO_MIN = 0.25  # 상자 안 대상 색 픽셀 비율 하한
-USE_COLOR_FALLBACK = True  # YOLO 미검출 시 색 분할로 대체
+USE_COLOR_FALLBACK = True  # YOLO 대상 상자 밖의 색 분할 덩어리를 추가 검출
 TARGET_DIAMETER = 0.095  # m
 MIN_BLOB_AREA = 60  # px
 MIN_CIRCULARITY = 0.6  # 색 분할 덩어리 원형도(4πA/P²) 하한
@@ -117,8 +118,10 @@ MAP_VIEW_SCALE = 2  # 격자 1칸의 픽셀 수
 LOG_INTERVAL = 1.0  # s, 주기 로그 간격
 
 # HSV 튜닝 도구 (controllers/hsv_tuner)
-TUNER_V = 0.10  # m/s, 키보드 전진 속도
-TUNER_W = 1.0  # rad/s, 키보드 회전 속도
+TUNER_V = 0.12  # m/s, 키보드 전진 속도
+TUNER_W = 0.6  # rad/s, 키보드 회전 속도
+TUNER_FINE_SCALE = 0.3  # Shift(Webots 창) 또는 대문자(OpenCV 창) 입력 시 속도 배율
+TUNER_KEY_HOLD = 0.6  # s (실제 시간), OpenCV 창 키 1회 입력의 유지 시간. 키 반복 지연보다 길게
 TUNER_FRAME_DIR = "frames"  # 컨트롤러 폴더 기준
 TUNER_LOG_FILE = "output/measurements.csv"  # 컨트롤러 폴더 기준, m 키 측정 기록
 TUNER_SCAN_W = 0.4  # rad/s, 자동 주행 제자리 회전 속도

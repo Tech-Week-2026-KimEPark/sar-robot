@@ -16,6 +16,7 @@ sar-robot 모듈의 구현 상태와 코드 위치를 정리한 문서입니다.
 | `sar/robot_io.py` | `RobotIO.lidar()` | 없음 | 거리 360개 [m]. 장치가 없으면 `None` |
 | `sar/robot_io.py` | `RobotIO.camera_bgr()` | 없음 | `(480, 640, 3)` BGR 이미지. 없으면 `None` |
 | `sar/robot_io.py` | `RobotIO.drive(v, w)` | 속도 명령 [m/s, rad/s] | 없음 |
+| `sar/robot_io.py` | `RobotIO.keys()` | 없음 | `(눌린 키 이름 집합, Shift 여부)`. 문자 키는 소문자, 방향키는 `"up"` 등. Webots 3D 화면 포커스 필요 |
 | `sar/odometry.py` | `Odometry(x, y, theta)` | 시작 pose | 객체 |
 | `sar/odometry.py` | `Odometry.update(enc_l, enc_r, compass=None)` | 누적 회전각 [rad], 보정된 나침반 방향 [rad] | 없음. 첫 호출은 기준값 저장 |
 | `sar/odometry.py` | `Odometry.pose()` | 없음 | `(x, y, theta)` |
@@ -114,7 +115,7 @@ $$
 |---|---|---|
 | YOLO 후보 | `YOLO_CLASSES`, `YOLO_CONF` | apple, orange, sports ball |
 | 색 판별 | `HSV_RANGES`, `COLOR_RATIO_MIN` | YOLO 상자 안 대상 색 픽셀 비율 하한 |
-| 색 분할 대체 | `USE_COLOR_FALLBACK`, `MIN_BLOB_AREA`, `MIN_CIRCULARITY` | YOLO 대상이 없을 때만 실행 |
+| 색 분할 보완 | `USE_COLOR_FALLBACK`, `MIN_BLOB_AREA`, `MIN_CIRCULARITY` | YOLO 대상 상자 밖의 덩어리만 추가 |
 | 높이 제외 | `HORIZON_MARGIN` | 중심이 화면 가운데선보다 이 값 이상 위면 식탁 위 물체로 제외 |
 | 연속 확인 | `CONFIRM_FRAMES`, `CONFIRM_MATCH_RADIUS` | 연속 검출 위치가 반경을 벗어나면 기록 초기화 |
 | 위치 추정 | `CONFIRM_MIN_DIST` | 가중치 $1 / \max(d, d_{\min})^2$의 거리 가중 평균 |

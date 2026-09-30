@@ -20,6 +20,25 @@ def wheel_speeds(v: float, w: float) -> tuple[float, float]:
     return wl, wr
 
 
+def decode_keys(
+    codes: list[int], arrows: dict[int, str], key_mask: int, shift_bit: int
+) -> tuple[set[str], bool]:
+    """Webots 키 코드 목록을 (키 이름 집합, Shift 여부)로 변환.
+
+    문자 키는 소문자 한 글자, 방향키는 arrows의 이름("up" 등). 그 밖의 키는 무시.
+    """
+    names: set[str] = set()
+    shift = False
+    for code in codes:
+        shift = shift or bool(code & shift_bit)
+        base = code & key_mask
+        if base in arrows:
+            names.add(arrows[base])
+        elif ord(" ") <= base <= ord("~"):
+            names.add(chr(base).lower())
+    return names, shift
+
+
 class RobotIO:
     def __init__(self) -> None:
         from controller import Robot
@@ -29,6 +48,7 @@ class RobotIO:
         self._lidar = self._enable(config.LIDAR_NAME)
         self._camera = self._enable(config.CAMERA_NAME)
         self._compass = self._enable(config.COMPASS_NAME)
+        self._keyboard = None  # keys() 첫 호출 때 켬
         self._left = self.robot.getDevice(config.LEFT_MOTOR_NAME)
         self._right = self.robot.getDevice(config.RIGHT_MOTOR_NAME)
         self._left_enc = self._left.getPositionSensor()
@@ -72,6 +92,32 @@ class RobotIO:
             return None
         h, w = self._camera.getHeight(), self._camera.getWidth()
         return np.frombuffer(image, np.uint8).reshape((h, w, 4))[:, :, :3].copy()
+
+    def keys(self) -> tuple[set[str], bool]:
+        """현재 눌린 키 (이름 집합, Shift 여부). Webots 3D 화면에 포커스가 있을 때만 입력됨.
+
+        누르고 있는 동안 매 step 반환됨. 문자 키는 소문자, 방향키는 "up", "down", "left",
+        "right". 첫 호출 때 키보드를 켜므로 그 step은 빈 집합을 반환함.
+        """
+        from controller import Keyboard
+
+        if self._keyboard is None:
+            self._keyboard = self.robot.getKeyboard()
+            self._keyboard.enable(self.timestep)
+            return set(), False
+        codes = []
+        for _ in range(config.KEYBOARD_MAX_KEYS):
+            code = self._keyboard.getKey()
+            if code == -1:
+                break
+            codes.append(code)
+        arrows = {
+            Keyboard.UP: "up",
+            Keyboard.DOWN: "down",
+            Keyboard.LEFT: "left",
+            Keyboard.RIGHT: "right",
+        }
+        return decode_keys(codes, arrows, Keyboard.KEY, Keyboard.SHIFT)
 
     def drive(self, v: float, w: float) -> None:
         """속도 명령 (v [m/s], w [rad/s])를 바퀴 각속도로 변환해 설정."""
