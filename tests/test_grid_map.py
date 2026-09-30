@@ -2,6 +2,7 @@ import math
 
 import numpy as np
 import pytest
+from planner_checks import random_map, reference_layers
 
 from sar import config
 from sar.grid_map import FREE, OCCUPIED, UNKNOWN, GridMap, simulate_scan
@@ -101,7 +102,7 @@ def test_layers_inflate_around_walls():
     gm = GridMap(0.0, 0.0, size=6.0)
     gm.seen[:] = True
     gm.logodds[room_walls(gm)] = config.L_MAX
-    gm._cache.clear()
+    gm.invalidate()
     occ, blocked, soft, unknown = gm.layers()
     assert occ[gm.to_cell(1.0, 0.0)]
     assert blocked[gm.to_cell(1.0 - config.INFLATE + 0.03, 0.0)]
@@ -118,7 +119,7 @@ def test_frontiers_groups_and_filters_small_clusters():
     gm.logodds[:, : gm.n // 2] = config.L_MIN
     # 오른쪽 모르는 영역 안 3칸 빈칸 섬: MIN_FRONTIER_CELLS 미만이므로 제외
     gm.seen[10, 60:63] = True
-    gm._cache.clear()
+    gm.invalidate()
     frontiers = gm.frontiers()
     assert len(frontiers) == 1
     size, cells = frontiers[0]
@@ -131,3 +132,99 @@ def test_frontiers_empty_when_fully_known():
     gm.seen[:] = True
     assert gm.frontiers() == []
     assert GridMap(0.0, 0.0, size=2.0).frontiers() == []
+
+
+def test_layers_match_independent_distance_calculation():
+    # 팽창 영역이 모든 장애물 칸까지의 유클리드 거리를 직접 계산한 결과와 같음
+    for seed in range(3):
+        gm = random_map(seed, size=4.0, blocks=8)
+        passable, _ = reference_layers(gm, allow_unknown=True)
+        _, blocked, _, _ = gm.layers()
+        assert np.array_equal(blocked, ~passable)
+
+
+def test_plan_version_changes_only_when_classification_changes():
+    gm = GridMap(0.0, 0.0, size=6.0)
+    scan = simulate_scan(room_walls(gm), gm.to_cell, (0.0, 0.0, 0.0))
+    gm.update((0.0, 0.0, 0.0), scan)
+    assert gm.version == 1 and gm.plan_version == 1
+    layers = gm.layers()
+    frontiers = gm.frontiers()
+    before = gm.logodds.copy()
+    gm.update((0.0, 0.0, 0.0), scan)  # 같은 스캔: log-odds는 변하고 분류는 유지
+    assert gm.version == 2 and gm.plan_version == 1
+    assert not np.array_equal(before, gm.logodds)
+    assert gm.layers() is layers  # 캐시 유지
+    assert gm.frontiers() == frontiers
+    # 새 장애물(1 m 앞 반사): 분류 변경으로 plan_version 증가와 캐시 무효화
+    person = list(scan)
+    person[180] = 0.5
+    gm.update((0.0, 0.0, 0.0), person)
+    gm.update((0.0, 0.0, 0.0), person)
+    assert gm.plan_version > 1
+    assert gm.layers() is not layers
+    assert gm.layers()[0][gm.to_cell(0.5, 0.0)]
+
+
+def test_new_cells_change_plan_version():
+    gm = GridMap(0.0, 0.0, size=10.0)
+    empty = [math.inf] * 360
+    gm.update((0.0, 0.0, 0.0), empty)
+    gm.update((0.0, 0.0, 0.0), empty)
+    version = gm.plan_version
+    gm.update((0.5, 0.0, 0.0), empty)  # 이동: 새로 확인한 칸 발생
+    assert gm.plan_version == version + 1
+
+
+def test_invalidate_after_direct_edit():
+    gm = GridMap(0.0, 0.0, size=4.0)
+    gm.seen[:] = True
+    gm.invalidate()
+    assert not gm.layers()[0].any()
+    version = gm.plan_version
+    gm.logodds[gm.to_cell(1.0, 0.0)] = config.L_MAX
+    gm.invalidate()
+    assert gm.plan_version == version + 1
+    assert gm.layers()[0][gm.to_cell(1.0, 0.0)]
+
+
+def test_update_ignores_non_finite_pose():
+    gm = GridMap(0.0, 0.0, size=4.0)
+    gm.update((math.nan, 0.0, 0.0), [1.0] * 360)
+    gm.update((0.0, 0.0, math.inf), [1.0] * 360)
+    assert not gm.seen.any() and gm.version == 0
+
+
+def test_frontier_sizes_match_frontiers():
+    gm = GridMap(0.0, 0.0, size=4.0)
+    gm.seen[:, : gm.n // 2] = True
+    gm.logodds[:, : gm.n // 2] = config.L_MIN
+    gm.seen[10, 60:63] = True  # MIN_FRONTIER_CELLS 미만 묶음
+    gm.invalidate()
+    sizes = gm.frontier_sizes()
+    assert sizes.shape == (gm.n, gm.n)
+    for size, cells in gm.frontiers():
+        assert all(sizes[cell] == size for cell in cells)
+    assert sizes[10, 61] == 0
+    assert np.count_nonzero(sizes) == sum(size for size, _ in gm.frontiers())
+    assert not GridMap(0.0, 0.0, size=2.0).frontier_sizes().any()
+
+
+def test_frontiers_returns_copy():
+    gm = GridMap(0.0, 0.0, size=4.0)
+    gm.seen[:, : gm.n // 2] = True
+    gm.invalidate()
+    first = gm.frontiers()
+    first.clear()
+    assert len(gm.frontiers()) == 1
+
+
+def test_simulate_scan_distances():
+    gm = GridMap(0.0, 0.0, size=6.0)
+    scan = simulate_scan(room_walls(gm), gm.to_cell, (0.0, 0.0, 0.0))
+    assert len(scan) == 360
+    # 정면(180)·왼쪽(90)·뒤(0)·오른쪽(270) 벽은 1 m 근처
+    for index in (0, 90, 180, 270):
+        assert scan[index] == pytest.approx(1.0, abs=gm.res)
+    open_scan = simulate_scan(np.zeros((gm.n, gm.n), bool), gm.to_cell, (0.0, 0.0, 0.0))
+    assert all(math.isinf(d) for d in open_scan)

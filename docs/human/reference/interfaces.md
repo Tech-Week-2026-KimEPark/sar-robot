@@ -31,18 +31,24 @@ sar-robot 모듈의 구현 상태와 코드 위치를 정리한 문서입니다.
 | `sar/viz.py` | `render_map(grid, to_cell, trajectory, path, rescued, start, pose, title)` | 공개값 격자(-1/0/1), 월드→격자 변환 함수, 월드 좌표 목록 | BGR 지도 그림 |
 | `sar/viz.py` | `save_map(path, image)` | 저장 경로, 그림 | 저장 성공 여부 `bool` |
 | `sar/grid_map.py` | `GridMap(center_x, center_y, size, res)` | 지도 중심 [m]. 기본값은 시작점, `MAP_SIZE`, `MAP_RES` | 지도 객체. 모든 칸 모름 |
-| `sar/grid_map.py` | `GridMap.update(pose, ranges)` | `(x, y, theta)`, 라이다 거리 목록 | 없음. `None`이면 무시 |
+| `sar/grid_map.py` | `GridMap.update(pose, ranges)` | `(x, y, theta)`, 라이다 거리 목록 | 없음. `None`이나 유한하지 않은 pose는 무시 |
 | `sar/grid_map.py` | `GridMap.to_cell(x, y)` | 월드 좌표 [m] | `(row, col)` |
 | `sar/grid_map.py` | `GridMap.to_world(row, col)` | 칸 | 칸 중심 `(x, y)` [m] |
 | `sar/grid_map.py` | `GridMap.layers()` | 없음 | `(occ, blocked, soft, unknown)` bool 배열 |
 | `sar/grid_map.py` | `GridMap.frontiers()` | 없음 | `[(칸 수, [(row, col), ...]), ...]`. 칸 수 내림차순 |
 | `sar/grid_map.py` | `GridMap.public()` (추가) | 없음 | 공개값 격자 int8 (-1/0/1). `render_map` 입력 |
 | `sar/grid_map.py` | `GridMap.clearance()` (추가) | 없음 | 가장 가까운 장애물까지 거리 [m] 배열 |
+| `sar/grid_map.py` | `GridMap.frontier_sizes()` (추가) | 없음 | 칸별 프론티어 묶음 칸 수 int32 배열. 프론티어가 아니면 0 |
+| `sar/grid_map.py` | `GridMap.version`, `GridMap.plan_version` (추가) | 없음 | 갱신 횟수, 계획용 분류(장애물·확인 여부) 변경 횟수 |
+| `sar/grid_map.py` | `GridMap.invalidate()` (추가) | 없음 | 없음. `logodds`·`seen`을 직접 수정한 뒤 호출 |
 | `sar/planner.py` | `plan(grid, start_xy, goal_xy, allow_unknown=False, field=None)` | 지도, 시작·목표 `(x, y)` | 0.1 m 간격 경로 `[(x, y), ...]`. 없으면 `None` |
 | `sar/planner.py` | `choose_frontier(grid, pose, blacklist)` | 지도, `(x, y, theta)`, 제외 좌표 목록 | 프론티어 목표 `(x, y)`. 없으면 `None` |
-| `sar/planner.py` | `DistanceField(grid, origin_xy)` (추가) | 지도, 기준점 `(x, y)` | 기준점까지 거리 지도 |
-| `sar/planner.py` | `DistanceField.distance(xy)` (추가) | 월드 좌표 | 기준점까지 경로 비용 [m]. 도달 불가면 `None` |
-| `sar/planner.py` | `DistanceField.path(xy)` (추가) | 월드 좌표 | xy에서 기준점까지 경로. 도달 불가면 `None` |
+| `sar/planner.py` | `choose_frontier_path(grid, pose, blacklist)` (추가) | `choose_frontier`와 같음 | `(목표 (x, y), 경로)`. 없으면 `None` |
+| `sar/planner.py` | `path_length(path)` (추가) | 경로 또는 `None` | 실제 경로 길이 [m]. `None`이면 `None` |
+| `sar/planner.py` | `DistanceField(grid, origin_xy)` (추가) | 지도, 기준점 `(x, y)` | 기준점까지 가중 비용 지도 |
+| `sar/planner.py` | `DistanceField.distance(xy)` (추가) | 월드 좌표 | 기준점까지 가중 비용 [m]. 도달 불가면 `None` |
+| `sar/planner.py` | `DistanceField.path(xy)` (추가) | 월드 좌표 | xy에서 기준점까지 경로. 도달 불가이거나 지도가 바뀌었으면 `None` |
+| `sar/planner.py` | `DistanceField.is_current()` (추가) | 없음 | 생성 이후 계획용 지도 상태가 그대로인지 여부 |
 | `sar/local_control.py` | `pure_pursuit(pose, path, lookahead=config.LOOKAHEAD)` | pose `(x, y, theta)`, 경로 `[(x, y), ...]` | `(v, w, reached)`. 목표 각도 차이 55° 이상이면 제자리 회전 |
 | `sar/local_control.py` | `safety_filter(v, w, ranges)` | 속도 명령, 라이다 360개 | `(v, w, blocked)`. 정면 ±25° 콘 안 `config.STOP_DIST` 이내면 정지 |
 | `sar/mission.py` | `Mission(io, odom, grid, detector, log=None)` | `RobotIO`, `Odometry`, `GridMap`, `TargetDetector`, 로그 함수 | 미션 객체. 시작점은 생성 시 `odom.pose()` |
@@ -60,14 +66,22 @@ LDS-01 라이다 인덱스는 180이 정면, 90이 왼쪽, 270이 오른쪽, 0�
 
 | 항목 | 규칙 |
 |---|---|
-| 호출 주기 | `GridMap.update()`는 매 step. `plan()`, `choose_frontier()`, `DistanceField`는 목표 변경, 경로 차단, 2초 주기에만 호출 |
-| 경로 형식 | 첫 점은 `start_xy`, 점 간격은 `PATH_STEP`. `pure_pursuit`에 그대로 전달 |
-| 통과 불가 시작·목표 | `SNAP_RADIUS` 안의 가장 가까운 통과 가능 칸을 경유. 목표를 옮긴 경우 경로 끝점은 대체 칸 중심 |
-| 복귀 | `mission`은 `plan(grid, pose, 시작점, allow_unknown=True)`을 2초 주기로 호출. `DistanceField`는 복귀 거리 판단이 필요할 때 사용 |
-| A* 가속 | `plan(..., field=f)`에 목표 기준 `DistanceField`를 전달하면 휴리스틱으로 사용. 결과 경로 비용은 같음 |
+| 호출 주기 | `GridMap.update()`는 매 step. `plan()`, `choose_frontier_path()`, `DistanceField`는 목표 변경, 경로 차단, 2초 주기에만 호출 |
+| 경로 형식 | 첫 점은 `start_xy`, 점 간격은 `PATH_STEP` 이하. `pure_pursuit`에 그대로 전달 |
+| 경로 안전 규칙 | 경로 선분이 지나가거나 닿는 모든 칸은 팽창 영역 밖. 모르는 칸은 `allow_unknown`이 참일 때만 통과 |
+| 통과 불가 목표 | `SNAP_RADIUS` 안에서 목표와 같은 쪽(사이에 장애물 칸 없음)의 가장 가까운 통과 가능 칸 중심에서 끝남. `path[-1] != goal_xy`로 확인 |
+| 통과 불가 시작 | 같은 쪽의 가장 가까운 통과 가능 칸까지 탈출 구간을 경로 앞에 추가. 탈출 구간은 장애물 칸을 지나지 않음 |
+| `None` 반환 | 경로 없음, 입력이 `None`·NaN·지도 밖, 유효한 대체 칸 없음. 예외는 발생하지 않음 |
+| 프론티어 | `choose_frontier_path()`가 목표와 경로를 한 번에 반환. `None`이면 도달 가능한 프론티어 없음 |
+| 복귀 | `mission`은 `plan(grid, pose, 시작점, allow_unknown=True)`을 2초 주기로 호출. 같은 지도 상태에서 복귀 비용 조회와 경로 계산을 함께 할 때는 `field=DistanceField(grid, 시작점)` 전달 |
+| 비용과 길이 | `DistanceField.distance()`는 벽 근처·모르는 칸 배수가 포함된 가중 비용. 시간 추정은 `path_length(path) / V_MAX` 사용 |
+| 거리 지도 유효성 | 지도 분류가 바뀌면 `is_current()`가 거짓. `path()`는 `None`, `plan(field=)`는 거리 지도를 무시하고 일반 A\*로 계산 |
+| 지도 직접 수정 | `logodds`·`seen`을 직접 바꾼 뒤 `invalidate()` 호출 |
 | 지도 그림 | `render_map(grid.public(), grid.to_cell, ...)` |
 
-동작 원리와 검증 결과는 docs [grid_map 기능 설명](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/explanation/features/grid_map.md)과 [planner 기능 설명](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/explanation/features/planner.md)에 있습니다.
+미션 루프 연결 순서, 재계획과 목표 재선택의 구분, 도착 판정 차이는 docs [planner 기능 설명](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/explanation/features/planner.md)의 "미션 연결 안내"에 있습니다. 지도 동작은 [grid_map 기능 설명](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/explanation/features/grid_map.md)에 있습니다.
+
+성능은 저장소 루트에서 `.venv/bin/python scripts/bench_planner.py`로 측정합니다.
 
 ## 대상 검출 결과
 
