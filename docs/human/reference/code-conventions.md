@@ -19,13 +19,16 @@ CI(`.github/workflows/ci.yml`)는 PR과 `main` push마다 위 3개 검사를 실
 |---|---|
 | `src/sar/<모듈>/` | 알고리즘과 로직. Webots 없이 실행 가능해야 함 |
 | `src/sar/robot_io.py` | Webots 장치 접근. `controller` 모듈 import는 이 파일에만 허용 |
-| `controllers/<이름>/<이름>.py` | Webots 진입점. `RobotIO` 생성과 루프만 작성 |
+| `controllers/<이름>/<이름>.py` | Webots 진입점. `.venv` 재실행, `RobotIO` 생성, 루프만 작성 |
+| `scripts/` | 개발 보조 스크립트. 테스트는 `tests/`에 작성 |
 | `src/sar/config.py` | 상수 전체 |
 | `tests/test_<모듈>.py` | 모듈별 pytest |
 
 - `src/sar/` 모듈에서 `from controller import ...`를 사용하지 않음. 테스트와 CI에 Webots가 없기 때문임
 - 모듈 사이 호출은 [모듈 인터페이스](interfaces.md)에 정의한 함수만 사용함
 - 순환 import가 생기면 공통 타입을 `geometry.py`로 옮김
+- 컨트롤러 파일의 `.venv` 재실행 전 코드는 Python 3.9 문법만 사용함. macOS Webots가 `/usr/bin/python3`(3.9)로 먼저 실행하기 때문임
+- 새 컨트롤러는 `controllers/sar_mission/sar_mission.py`의 `use_venv_python()`과 `sys.path` 설정을 복사해 시작함
 
 ## 이름 규칙
 

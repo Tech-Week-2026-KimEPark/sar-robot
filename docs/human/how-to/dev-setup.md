@@ -23,7 +23,7 @@ python3.12 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt
 ```
 
-가상환경 경로는 반드시 저장소 루트의 `.venv`로 만드십시오. Webots 컨트롤러 설정(`runtime.ini`)이 이 경로를 사용합니다.
+가상환경 경로는 반드시 저장소 루트의 `.venv`로 만드십시오. Webots 컨트롤러가 이 경로의 Python으로 재실행합니다.
 
 YOLO를 사용하는 작업에는 추가 의존성을 설치하십시오. torch를 포함해 약 1 GB입니다.
 
@@ -58,29 +58,37 @@ Ubuntu는 [Webots 설치 안내](https://cyberbotics.com/doc/guide/installation-
 
 ### 4. 시뮬레이션 실행
 
-1. Webots를 실행하고 File > Open World에서 `worlds/sar_dev.wbt`를 여십시오.
-2. 첫 실행 시 월드의 외부 PROTO와 텍스처를 인터넷에서 내려받습니다. 완료까지 수 분이 걸릴 수 있습니다.
-3. 시뮬레이션을 시작하십시오. 로봇 컨트롤러는 `sar_mission`입니다.
+Webots R2025a는 월드의 텍스처·메시를 raw.githubusercontent.com에서 내려받습니다. 이때 Webots에 포함된 Qt 6.5.3의 HTTP/2 처리 오류로 `error code: 399: Server is unable to maintain the header compression context` 경고가 발생하고 텍스처가 표시되지 않습니다. 월드를 열기 전에 에셋을 Webots 캐시에 저장하십시오.
 
-`controllers/sar_mission/runtime.ini`는 다음 2가지를 설정합니다. Webots 환경설정의 Python command는 변경하지 않아도 됩니다.
+```bash
+.venv/bin/python scripts/prefetch_webots_assets.py
+```
 
-| 설정 | 값 | 목적 |
-|---|---|---|
-| `PYTHONPATH` | `../../src` | `sar` 패키지 import |
-| `[python] COMMAND` | `../../.venv/bin/python` | 가상환경의 numpy·OpenCV 사용 |
+이 스크립트는 `worlds/webots_assets.txt`의 URL을 HTTP/1.1로 내려받습니다. 저장 위치는 Webots 캐시 폴더(macOS `~/Library/Caches/Cyberbotics/Webots/assets/`)이며 파일 이름은 URL의 SHA1 값입니다. 다른 월드에서 같은 경고가 나오면 Webots 콘솔 내용을 파일로 저장해 인자로 전달하십시오. 콘솔 로그의 `Cannot download` URL을 추출해 캐시에 저장합니다.
+
+```bash
+.venv/bin/python scripts/prefetch_webots_assets.py webots_console.txt
+```
+
+에셋 저장 후 다음 순서로 실행하십시오.
+
+1. Webots를 실행하고 File > Open World에서 `worlds/sar_dev.wbt`를 여십시오. 이미 열려 있으면 File > Reload World를 선택하십시오.
+2. 시뮬레이션을 시작하십시오. 로봇 컨트롤러는 `sar_mission`입니다.
+
+Webots는 환경설정의 Python command(기본 `python3`)로 컨트롤러를 실행합니다. `sar_mission.py`는 실행 직후 저장소 `.venv`의 Python으로 자신을 다시 실행하고 `src/`를 import 경로에 추가합니다. 따라서 Webots 환경설정은 변경하지 않아도 됩니다. macOS에서 Finder로 실행한 Webots는 셸의 PATH를 사용하지 않으므로 `/usr/bin/python3`(Xcode Command Line Tools)를 사용합니다.
 
 ## 결과 확인
 
-- 테스트: `10 passed` 이상 출력
+- 테스트: `12 passed` 이상 출력
+- 에셋 스크립트: `92 URLs, 0 failed` 출력
 - Webots 콘솔: 1초마다 `t=1.0s pose=(0.00, 0.00, 0.00) lidar_points=360 front=...m` 형식의 로그 출력. 로봇은 정지 상태
-
-Webots 콘솔 로그는 작성 시점에 확인하지 못했습니다. 처음 확인한 팀원이 이 문서의 확인 결과를 갱신하십시오.
 
 | 증상 | 확인할 내용 |
 |---|---|
-| `ModuleNotFoundError: No module named 'sar'` | `runtime.ini`가 컨트롤러 폴더에 있는지, `src/sar/__init__.py` 존재 여부 |
-| `ModuleNotFoundError: No module named 'numpy'` | 저장소 루트 `.venv` 존재 여부, `requirements.txt` 설치 여부 |
-| 월드 로딩이 멈춤 | 인터넷 연결, Webots 콘솔의 PROTO 다운로드 오류 |
+| `Cannot download ... error code: 399` | `scripts/prefetch_webots_assets.py` 실행 후 Reload World |
+| `.venv/bin/python 없음` | 저장소 루트에서 가상환경 생성 절차 실행 |
+| `Unable to find the 'python' executable` | Webots > Preferences > Python command에 `.venv/bin/python`의 절대 경로 입력 |
+| `ModuleNotFoundError: No module named 'numpy'` | `requirements.txt` 설치 여부 |
 | `lidar_points=0` | 월드의 로봇 `extensionSlot`에 `RobotisLds01` 존재 여부 |
 
 ## 관련 자료
