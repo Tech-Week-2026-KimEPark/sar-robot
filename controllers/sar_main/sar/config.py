@@ -35,6 +35,7 @@ LOOKAHEAD = 0.35  # m
 GOAL_TOL = 0.15  # m
 SAFETY_MARGIN = 0.06  # m, 몸체 바깥 여유
 STOP_DIST = 0.20  # m, 정면 즉시 정지 거리
+NEAR_SLOWDOWN = False  # #18 근접 감속·양보. 벽에도 동작해 복귀가 느려져 기본 꺼짐
 
 # 지도
 MAP_RES = 0.05  # m
